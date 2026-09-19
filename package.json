@@ -1,0 +1,32 @@
+{
+  "name": "sa_bankaccount",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HUY-TD16/SA_BankAccount.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/HUY-TD16/SA_BankAccount/issues"
+  },
+  "homepage": "https://github.com/HUY-TD16/SA_BankAccount#readme",
+  "dependencies": {
+    "dotenv": "^18.0.1",
+    "prisma": "^8.0.0-rc.15"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2"
+  }
+}

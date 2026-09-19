@@ -24,7 +24,7 @@
   "homepage": "https://github.com/HUY-TD16/SA_BankAccount#readme",
   "dependencies": {
     "dotenv": "^18.0.1",
-    "prisma": "^8.0.0-rc.15"
+    "prisma": "^7.10.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.2"

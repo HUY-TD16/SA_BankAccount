@@ -4,6 +4,8 @@
     "module": "NodeNext",
     "target": "ES2022",
     "esModuleInterop": true,
-    "types": ["node"]
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }

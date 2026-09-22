@@ -4,8 +4,12 @@
     "module": "commonjs",
     "target": "ES2022",
     "esModuleInterop": true,
-    "types": ["node"],
+    "types": ["node", "jest"],
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["src/*"]
+    }
   }
 }

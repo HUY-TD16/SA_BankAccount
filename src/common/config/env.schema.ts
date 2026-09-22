@@ -1,4 +1,4 @@
-import { plainToInstance } from "class-transformer";
+import { plainToInstance, Type } from "class-transformer";
 import {
   IsIn,
   IsInt,
@@ -27,10 +27,11 @@ class EnvironmentVariables {
   @IsIn([NodeEnv.DEVELOPMENT, NodeEnv.TEST, NodeEnv.PRODUCTION])
   NODE_ENV: NodeEnv = NodeEnv.DEVELOPMENT;
 
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   @Max(65535)
-  PORT = 3000;
+  PORT: number = 3000;
 
   @IsString()
   @IsNotEmpty()
@@ -45,10 +46,11 @@ class EnvironmentVariables {
   @IsNotEmpty()
   JWT_ACCESS_TTL = "60m";
 
+  @Type(() => Number)
   @IsInt()
   @Min(4)
   @Max(15)
-  BCRYPT_ROUNDS = 12;
+  BCRYPT_ROUNDS: number = 12;
 }
 
 export function validateEnv(

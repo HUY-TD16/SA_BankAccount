@@ -1,49 +1,58 @@
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
+  provider = "postgresql"
 }
 
 enum AccountType {
-    CHECKING
-    CREDIT_CARD
-    SAVINGS
-    INVESTMENT
-    LOAN
+  CHECKING
+  CREDIT_CARD
+  SAVINGS
+  INVESTMENT
+  LOAN
+}
+
+enum AccountStatus {
+  ACTIVE
+  FROZEN
+  CLOSED
 }
 
 model User {
-    id                Int      @id @default(autoincrement()) @map("user_id")
-    fullName          String   @map("full_name") @db.VarChar(100)
-    email             String   @unique @db.VarChar(255)
-    username          String   @unique @db.VarChar(50)
-    password          String   @db.VarChar(255)
-    phoneNumber       String   @map("phone_number") @db.VarChar(20)
-    profilePictureUrl String   @map("profile_picture_url") @db.Text
-    totalBalance      Decimal  @default(0) @map("total_balance") @db.Decimal(18, 0)
-    createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  id                Int      @id @default(autoincrement()) @map("user_id")
+  fullName          String   @map("full_name") @db.VarChar(100)
+  email             String   @unique @db.VarChar(255)
+  username          String   @unique @db.VarChar(50)
+  password          String   @db.VarChar(255)
+  phoneNumber       String   @map("phone_number") @db.VarChar(20)
+  profilePictureUrl String   @map("profile_picture_url") @db.Text
+  totalBalance      Decimal  @default(0) @map("total_balance") @db.Decimal(18, 0)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
-    accounts Account[]
+  accounts Account[]
 
-    @@map("users")
+  @@map("users")
 }
 
 model Account {
-    id                 Int         @id @default(autoincrement()) @map("account_id")
-    userId             Int         @map("user_id")
-    bankName           String      @map("bank_name") @db.VarChar(100)
-    accountType        AccountType @map("account_type")
-    branchName         String?     @map("branch_name") @db.VarChar(100)
-    accountNumberFull  String      @unique @map("account_number_full") @db.VarChar(50)
-    accountNumberLast4 String      @map("account_number_last_4") @db.VarChar(4)
-    balance            Decimal     @default(0) @db.Decimal(18, 0)
-    createdAt          DateTime    @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  id                 Int           @id @default(autoincrement()) @map("account_id")
+  userId             Int           @map("user_id")
+  bankName           String        @map("bank_name") @db.VarChar(100)
+  accountType        AccountType   @map("account_type")
+  status             AccountStatus @default(ACTIVE)
+  currency           String        @default("VND") @db.VarChar(3)
+  version            Int           @default(0)
+  branchName         String?       @map("branch_name") @db.VarChar(100)
+  accountNumberFull  String        @unique @map("account_number_full") @db.VarChar(50)
+  accountNumberLast4 String        @map("account_number_last_4") @db.VarChar(4)
+  balance            Decimal       @default(0) @db.Decimal(18, 0)
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-    user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
-    @@map("accounts")
+  @@map("accounts")
 }

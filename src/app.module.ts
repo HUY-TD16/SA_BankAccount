@@ -4,14 +4,14 @@ import { APP_GUARD } from "@nestjs/core";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { AccountsModule } from "./modules/accounts/accounts.module";
 import { MoneyMovementModule } from "./modules/money-movement/money-movement.module";
-import { AccessTokenGuard } from "./common/security/guards";
-import { LoggerService } from "./common/observability";
+import { AccessTokenGuard } from "@src/common/security/guards";
+import { LoggerService } from "@src/common/observability";
 import {
   validateEnv,
   appConfig,
   jwtConfig,
   databaseConfig,
-} from "./common/config";
+} from "@src/common/config";
 
 @Module({
   imports: [

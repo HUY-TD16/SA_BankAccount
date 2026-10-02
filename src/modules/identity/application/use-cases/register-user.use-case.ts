@@ -1,15 +1,13 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { ValidationError } from "@src/common/domain/errors/common.errors";
+import { ValidationError } from "@src/common/domain/errors";
 import {
   USER_REPOSITORY,
   UserRepositoryPort,
-} from "../ports/user.repository.port";
-import {
   PASSWORD_HASHER,
   PasswordHasherPort,
-} from "../ports/password-hasher.port";
-import { EmailAlreadyExistsError } from "../../domain/errors/identity.errors";
-import { RegisterDto } from "../../presentation/http/dto/register.dto";
+} from "@src/modules/identity/application/ports";
+import { EmailAlreadyExistsError } from "@src/modules/identity/domain/errors";
+import { RegisterDto } from "@src/modules/identity/presentation/http/dto/register.dto";
 
 @Injectable()
 export class RegisterUserUseCase {

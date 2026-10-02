@@ -3,8 +3,7 @@ import {
   ValidationPipe,
   ValidationPipeOptions,
 } from "@nestjs/common";
-import { ErrorDetail } from "../../domain/errors/app.error";
-import { ValidationError } from "../../domain/errors/common.errors";
+import { ErrorDetail, ValidationError } from "@src/common/domain/errors";
 
 function flattenValidationErrors(
   errors: NestValidationError[],

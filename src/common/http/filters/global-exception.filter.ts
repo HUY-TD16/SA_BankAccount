@@ -6,9 +6,9 @@ import {
   Logger,
 } from "@nestjs/common";
 import { Response } from "express";
-import { AppError, ErrorDetail } from "../../domain/errors/app.error";
-import { redactSensitive } from "../../observability/logger.service";
-import { RequestWithId } from "../middleware/request-id.middleware";
+import { AppError, ErrorDetail } from "@src/common/domain/errors";
+import { redactSensitive } from "@src/common/observability";
+import { RequestWithId } from "@src/common/http/middleware";
 
 interface ErrorEnvelope {
   success: false;

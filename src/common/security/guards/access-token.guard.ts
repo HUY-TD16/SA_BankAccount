@@ -6,13 +6,13 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { Request } from "express";
-import { UnauthorizedError } from "../../domain/errors/common.errors";
-import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { UnauthorizedError } from "@src/common/domain/errors";
+import { IS_PUBLIC_KEY } from "@src/common/security/decorators";
 import {
   AccessTokenPayload,
   TOKEN_SERVICE,
   TokenServicePort,
-} from "../ports/token-service.port";
+} from "@src/common/security/ports";
 
 function extractBearerToken(authorizationHeader?: string): string | undefined {
   if (!authorizationHeader) return undefined;

@@ -1,11 +1,11 @@
 import type {
     AccountsFacade,
-} from '../../../accounts/application/ports/accounts.facade';
+} from '@src/modules/accounts/application/ports';
 
 import type {
     AccountsPort,
     TransferRecipient,
-} from '../../application/ports/accounts.port';
+} from '@src/modules/money-movement/application/ports';
 
 export class AccountsAdapter implements AccountsPort {
     private readonly facade: AccountsFacade;

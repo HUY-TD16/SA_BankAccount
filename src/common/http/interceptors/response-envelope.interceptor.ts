@@ -6,7 +6,7 @@ import {
 } from "@nestjs/common";
 import { Observable } from "rxjs";
 import { map } from "rxjs/operators";
-import { RequestWithId } from "../middleware/request-id.middleware";
+import { RequestWithId } from "@src/common/http/middleware";
 
 /**
  * Wrapper để use case đánh dấu rõ ràng "đây là kết quả phân trang", thay vì để

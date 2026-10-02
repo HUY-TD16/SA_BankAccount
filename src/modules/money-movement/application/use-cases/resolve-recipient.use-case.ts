@@ -1,7 +1,7 @@
 import type {
     AccountsPort,
     TransferRecipient,
-} from '../ports/accounts.port';
+} from '@src/modules/money-movement/application/ports';
 
 export class ResolveRecipientUseCase {
     private readonly accounts: AccountsPort;

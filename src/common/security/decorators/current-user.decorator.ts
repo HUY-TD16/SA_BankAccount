@@ -1,6 +1,6 @@
 import { createParamDecorator, ExecutionContext } from "@nestjs/common";
 import { Request } from "express";
-import { AccessTokenPayload } from "../ports/token-service.port";
+import { AccessTokenPayload } from "@src/common/security/ports";
 
 /**
  * Lấy user hiện tại (đã gắn bởi AccessTokenGuard) trong controller.

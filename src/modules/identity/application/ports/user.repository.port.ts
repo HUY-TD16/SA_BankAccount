@@ -1,4 +1,4 @@
-import { User } from "../../domain/entities/user.entity";
+import { User } from "@src/modules/identity/domain/entities";
 
 export const USER_REPOSITORY = Symbol("USER_REPOSITORY");
 

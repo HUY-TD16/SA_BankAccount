@@ -2,17 +2,15 @@ import { Inject, Injectable } from "@nestjs/common";
 import {
   TOKEN_SERVICE,
   TokenServicePort,
-} from "@src/common/security/ports/token-service.port";
+} from "@src/common/security/ports";
 import {
   USER_REPOSITORY,
   UserRepositoryPort,
-} from "../ports/user.repository.port";
-import {
   PASSWORD_HASHER,
   PasswordHasherPort,
-} from "../ports/password-hasher.port";
-import { InvalidCredentialsError } from "../../domain/errors/identity.errors";
-import { LoginDto } from "../../presentation/http/dto/login.dto";
+} from "@src/modules/identity/application/ports";
+import { InvalidCredentialsError } from "@src/modules/identity/domain/errors";
+import { LoginDto } from "@src/modules/identity/presentation/http/dto/login.dto";
 
 // Hash bcrypt gia dung khi user khong ton tai, de bcrypt.compare van ton thoi gian
 // tinh toan tuong duong truong hop user ton tai - giam kha nang do email qua timing.

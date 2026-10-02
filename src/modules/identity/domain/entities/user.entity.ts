@@ -6,7 +6,7 @@ export class User {
   constructor(
     public readonly id: string,
     public readonly email: string,
-    public readonly fullname: string,
+    public readonly fullName: string,
     public readonly passwordHash: string,
     public readonly createAt: Date,
     public readonly updateAt: Date,
@@ -18,13 +18,13 @@ export class User {
   toSafeObject(): {
     id: string;
     email: string;
-    fullname: string;
+    fullName: string;
     createAt: string;
   } {
     return {
       id: this.id,
       email: this.email,
-      fullname: this.fullname,
+      fullName: this.fullName,
       createAt: this.createAt.toISOString(),
     };
   }

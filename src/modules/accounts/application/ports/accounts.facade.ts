@@ -1,13 +1,12 @@
-export type AccountStatus = 'ACTIVE' | 'FROZEN' | 'CLOSED';
+export type AccountStatus = 'ACTIVE' | 'CLOSED';
 
 export interface AccountLookupResult {
-    readonly id: number;
+    readonly id: string;
     readonly accountNumber: string;
-    readonly currency: string;
+    readonly currency: 'VND';
     readonly status: AccountStatus;
 }
 
 export interface AccountsFacade {
     findByAccountNumber(accountNumber: string): Promise<AccountLookupResult | null>;
 }
-

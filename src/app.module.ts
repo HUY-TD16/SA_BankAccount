@@ -1,9 +1,10 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { APP_GUARD } from "@nestjs/core";
-import { IdentityModule } from "./modules/identity/identity.module";
-import { AccountsModule } from "./modules/accounts/accounts.module";
-import { MoneyMovementModule } from "./modules/money-movement/money-movement.module";
+import { PrismaModule } from "@src/infrastructure/prisma";
+import { IdentityModule } from "@src/modules/identity/identity.module";
+import { AccountsModule } from "@src/modules/accounts/accounts.module";
+import { MoneyMovementModule } from "@src/modules/money-movement/money-movement.module";
 import { AccessTokenGuard } from "@src/common/security/guards";
 import { LoggerService } from "@src/common/observability";
 import {
@@ -20,6 +21,7 @@ import {
       validate: validateEnv,
       load: [appConfig, jwtConfig, databaseConfig],
     }),
+    PrismaModule,
     IdentityModule,
     AccountsModule,
     MoneyMovementModule,

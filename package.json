@@ -11,7 +11,11 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "build": "tsc --noEmit"
+    "build": "nest build",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main"
   },
   "repository": {
     "type": "git",
@@ -28,15 +32,20 @@
   "dependencies": {
     "@nestjs/config": "^12.0.0",
     "@nestjs/core": "^12.0.4",
+    "@nestjs/platform-express": "^12.1.2",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^18.0.1",
+    "pg": "^8.23.1",
     "prisma": "^7.10.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^26.6.2",
+    "@types/pg": "^8.23.1",
     "jest": "^30.5.2",
     "ts-jest": "^29.4.12"
   }

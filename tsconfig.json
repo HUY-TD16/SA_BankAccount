@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
     "moduleResolution": "node",
     "module": "commonjs",
     "target": "ES2022",
@@ -10,6 +12,16 @@
     "baseUrl": ".",
     "paths": {
       "@src/*": ["src/*"]
-    }
-  }
+    },
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "docs",
+    "**/*.spec.ts",
+    "prisma.config.ts"
+  ]
 }

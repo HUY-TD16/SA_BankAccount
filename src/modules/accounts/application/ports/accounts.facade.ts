@@ -1,4 +1,8 @@
-export type AccountStatus = 'ACTIVE' | 'CLOSED';
+import type { AccountStatus } from '../../domain/enums/account-status';
+
+export type { AccountStatus } from '../../domain/enums/account-status';
+
+export const ACCOUNTS_FACADE = Symbol('ACCOUNTS_FACADE');
 
 export interface AccountLookupResult {
     readonly id: string;

@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -7,53 +7,117 @@ datasource db {
   provider = "postgresql"
 }
 
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
 enum AccountType {
-  CHECKING
-  CREDIT_CARD
+  PAYMENT
   SAVINGS
-  INVESTMENT
-  LOAN
 }
 
 enum AccountStatus {
   ACTIVE
-  FROZEN
   CLOSED
 }
 
-model User {
-  id                Int      @id @default(autoincrement()) @map("user_id")
-  fullName          String   @map("full_name") @db.VarChar(100)
-  email             String   @unique @db.VarChar(255)
-  username          String   @unique @db.VarChar(50)
-  password          String   @db.VarChar(255)
-  phoneNumber       String   @map("phone_number") @db.VarChar(20)
-  profilePictureUrl String   @map("profile_picture_url") @db.Text
-  totalBalance      Decimal  @default(0) @map("total_balance") @db.Decimal(18, 0)
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
 
-  accounts Account[]
+enum ReferenceType {
+  OPENING_DEPOSIT
+  CASH_DEPOSIT
+  CASH_WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum TransactionStatus {
+  COMPLETED
+}
+
+enum TransferStatus {
+  COMPLETED
+}
+
+// ---------------------------------------------------------------------------
+// Models
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid()) @map("user_id")
+  email        String   @unique @db.VarChar(254)
+  fullName     String   @map("full_name") @db.VarChar(100)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  accounts  BankAccount[]
+  transfers Transfer[]
 
   @@map("users")
 }
 
-model Account {
-  id                 Int           @id @default(autoincrement()) @map("account_id")
-  userId             Int           @map("user_id")
-  bankName           String        @map("bank_name") @db.VarChar(100)
-  accountType        AccountType   @map("account_type")
-  status             AccountStatus @default(ACTIVE)
-  currency           String        @default("VND") @db.VarChar(3)
-  version            Int           @default(0)
-  branchName         String?       @map("branch_name") @db.VarChar(100)
-  accountNumberFull  String        @unique @map("account_number_full") @db.VarChar(50)
-  accountNumberLast4 String        @map("account_number_last_4") @db.VarChar(4)
-  balance            Decimal       @default(0) @db.Decimal(18, 0)
-  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+model BankAccount {
+  id             String        @id @default(uuid()) @map("id")
+  userId         String        @map("user_id")
+  accountNumber  String        @unique @map("account_number") @db.VarChar(20)
+  accountName    String        @map("account_name") @db.VarChar(100)
+  accountType    AccountType   @map("account_type")
+  currentBalance Decimal       @default(0) @map("current_balance") @db.Decimal(18, 0)
+  currency       String        @default("VND") @map("currency") @db.Char(3)
+  status         AccountStatus @default(ACTIVE)
+  closedAt       DateTime?     @map("closed_at") @db.Timestamptz
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  transactions FinancialTransaction[]
+  transfersOut Transfer[]             @relation("SourceAccount")
+  transfersIn  Transfer[]             @relation("DestinationAccount")
 
-  @@map("accounts")
+  @@index([userId, status, createdAt(sort: Desc)], name: "idx_accounts_user_status_created")
+  @@map("bank_accounts")
+}
+
+model FinancialTransaction {
+  id              String            @id @default(uuid())
+  accountId       String            @map("account_id")
+  transferId      String?           @map("transfer_id")
+  transactionType TransactionType   @map("transaction_type")
+  referenceType   ReferenceType     @map("reference_type")
+  amount          Decimal           @db.Decimal(18, 0)
+  balanceAfter    Decimal           @map("balance_after") @db.Decimal(18, 0)
+  status          TransactionStatus @default(COMPLETED)
+  description     String?           @db.VarChar(250)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz
+
+  account  BankAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  transfer Transfer?   @relation(fields: [transferId], references: [id])
+
+  @@unique([transferId, transactionType], name: "uq_transfer_transaction_type")
+  @@index([accountId, createdAt(sort: Desc), id(sort: Desc)], name: "idx_transactions_account_created")
+  @@map("financial_transactions")
+}
+
+model Transfer {
+  id                   String         @id @default(uuid())
+  sourceAccountId      String         @map("source_account_id")
+  destinationAccountId String         @map("destination_account_id")
+  initiatedByUserId    String         @map("initiated_by_user_id")
+  amount               Decimal        @db.Decimal(18, 0)
+  description          String?        @db.VarChar(250)
+  idempotencyKey       String         @map("idempotency_key") @db.VarChar(128)
+  status               TransferStatus @default(COMPLETED)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  sourceAccount      BankAccount          @relation("SourceAccount", fields: [sourceAccountId], references: [id], onDelete: Restrict)
+  destinationAccount BankAccount          @relation("DestinationAccount", fields: [destinationAccountId], references: [id], onDelete: Restrict)
+  initiatedByUser    User                 @relation(fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+  transactions       FinancialTransaction[]
+
+  @@unique([sourceAccountId, idempotencyKey], name: "uq_transfer_idempotency")
+  @@map("transfers")
 }

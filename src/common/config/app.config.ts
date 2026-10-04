@@ -7,4 +7,5 @@ import { registerAs } from "@nestjs/config";
 export default registerAs("app", () => ({
   port: parseInt(process.env.PORT ?? "3000", 10),
   globalPrefix: "api/v1",
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS ?? "12", 10),
 }));

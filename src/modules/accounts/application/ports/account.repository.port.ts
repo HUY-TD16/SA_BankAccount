@@ -7,7 +7,7 @@ export const ACCOUNT_REPOSITORY = Symbol('ACCOUNT_REPOSITORY');
 
 export interface CreateAccountInput {
     readonly userId: string;
-    readonly accountNumber: string;
+    readonly accountName: string;
     readonly accountType: AccountType;
     initialDeposit: Money;
 }
@@ -24,13 +24,11 @@ export interface AccountRepositoryPort {
 
     findByAccountNumber(accountNumber: string): Promise<BankAccount | null>;
 
-    listByAccountNumber(accountNumber: string): Promise<BankAccount | null>;
-
     listByOwner(userId: string,
                 options: {
                     status?: AccountStatus;
-                    page?: number;
-                    limit?: number;
+                    page: number;
+                    limit: number;
                 },
             ): Promise<AccountPage>;
 }

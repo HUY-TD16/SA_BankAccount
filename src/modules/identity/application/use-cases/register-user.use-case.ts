@@ -7,7 +7,13 @@ import {
   PasswordHasherPort,
 } from "@src/modules/identity/application/ports";
 import { EmailAlreadyExistsError } from "@src/modules/identity/domain/errors";
-import { RegisterDto } from "@src/modules/identity/presentation/http/dto/register.dto";
+
+export interface RegisterUserCommand {
+  fullName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
 
 @Injectable()
 export class RegisterUserUseCase {
@@ -18,7 +24,7 @@ export class RegisterUserUseCase {
     private readonly passwordHasher: PasswordHasherPort,
   ) {}
 
-  async execute(dto: RegisterDto) {
+  async execute(dto: RegisterUserCommand) {
     // confirmPassword
     if (dto.password !== dto.confirmPassword) {
       throw new ValidationError([

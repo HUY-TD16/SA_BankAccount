@@ -1,8 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import {
-  TOKEN_SERVICE,
-  TokenServicePort,
-} from "@src/common/security/ports";
+import { TOKEN_SERVICE, TokenServicePort } from "@src/common/security/ports";
 import {
   USER_REPOSITORY,
   UserRepositoryPort,
@@ -10,8 +7,11 @@ import {
   PasswordHasherPort,
 } from "@src/modules/identity/application/ports";
 import { InvalidCredentialsError } from "@src/modules/identity/domain/errors";
-import { LoginDto } from "@src/modules/identity/presentation/http/dto/login.dto";
 
+export interface LoginCommand {
+  email: string;
+  password: string;
+}
 // Hash bcrypt gia dung khi user khong ton tai, de bcrypt.compare van ton thoi gian
 // tinh toan tuong duong truong hop user ton tai - giam kha nang do email qua timing.
 const DUMMY_HASH =
@@ -27,7 +27,7 @@ export class LoginUseCase {
     @Inject(TOKEN_SERVICE) private readonly tokenService: TokenServicePort,
   ) {}
 
-  async execute(dto: LoginDto) {
+  async execute(dto: LoginCommand) {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const user = await this.userRepository.findByEmail(normalizedEmail);
 

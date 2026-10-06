@@ -12,6 +12,7 @@ const noopDecorator = () => () => {};            // @Decorator() → ()=>void
 const noopParamDecorator = () => () => {};       // @Inject(token) → ()=>void
 
 const Injectable  = noopDecorator;
+const Global      = noopDecorator;
 const Catch       = noopDecorator;
 const SetMetadata = (_key, _val) => noopDecorator();
 const Inject      = noopParamDecorator;
@@ -98,6 +99,7 @@ class ValidationPipe {
 module.exports = {
   // Decorators
   Injectable,
+  Global,
   Catch,
   SetMetadata,
   Inject,

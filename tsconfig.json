@@ -15,7 +15,7 @@
     },
     "ignoreDeprecations": "6.0"
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "test/unit/transfer-money.use-case.spec.ts"],
   "exclude": [
     "node_modules",
     "dist",

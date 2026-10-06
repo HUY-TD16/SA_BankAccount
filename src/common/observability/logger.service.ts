@@ -49,6 +49,10 @@ export function redactSensitive<T>(value: T): T {
  */
 @Injectable()
 export class LoggerService extends ConsoleLogger implements NestLoggerService {
+  constructor() {
+    super();
+  }
+
   log(message: unknown, ...optionalParams: unknown[]): void {
     super.log(this.safe(message), ...optionalParams.map((p) => this.safe(p)));
   }

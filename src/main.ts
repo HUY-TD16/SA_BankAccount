@@ -2,7 +2,10 @@ import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
 import { requestIdMiddleware } from "@src/common/http/middleware";
 import { GlobalExceptionFilter } from "@src/common/http/filters";
-import { ResponseEnvelopeInterceptor } from "@src/common/http/interceptors";
+import {
+  ResponseEnvelopeInterceptor,
+  HttpLoggingInterceptor,
+} from "@src/common/http/interceptors";
 import { createGlobalValidationPipe } from "@src/common/http/pipes";
 import { LoggerService } from "@src/common/observability";
 
@@ -16,7 +19,10 @@ async function bootstrap() {
 
   app.use(requestIdMiddleware);
   app.useGlobalFilters(new GlobalExceptionFilter());
-  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor());
+  app.useGlobalInterceptors(
+    new HttpLoggingInterceptor(),
+    new ResponseEnvelopeInterceptor(),
+  );
   app.useGlobalPipes(createGlobalValidationPipe());
   app.enableShutdownHooks();
 

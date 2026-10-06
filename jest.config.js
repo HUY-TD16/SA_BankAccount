@@ -11,6 +11,8 @@ module.exports = {
     // Dùng manual CJS mock thay thế để unit test không phụ thuộc vào NestJS runtime.
     '^@nestjs/common$': '<rootDir>/test/__mocks__/@nestjs/common.js',
     '^@nestjs/core$':   '<rootDir>/test/__mocks__/@nestjs/core.js',
+    '^@nestjs/config$': '<rootDir>/test/__mocks__/@nestjs/config.js',
+    '^@nestjs/swagger$': '<rootDir>/test/__mocks__/@nestjs/swagger.js',
   },
   // transformIgnorePatterns giữ mặc định — mock đã xử lý @nestjs/common và core
   transformIgnorePatterns: ['<rootDir>/node_modules/'],

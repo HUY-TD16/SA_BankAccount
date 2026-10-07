@@ -1,4 +1,4 @@
-export * from './app.config';
-export * from './database.config';
-export * from './env.schema';
-export * from './jwt.config';
+export { default as appConfig } from "./app.config";
+export { default as databaseConfig } from "./database.config";
+export { default as jwtConfig } from "./jwt.config";
+export * from "./env.schema";

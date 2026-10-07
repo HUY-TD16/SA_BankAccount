@@ -12,10 +12,45 @@ const noopDecorator = () => () => {};            // @Decorator() → ()=>void
 const noopParamDecorator = () => () => {};       // @Inject(token) → ()=>void
 
 const Injectable  = noopDecorator;
+const Global      = noopDecorator;
 const Catch       = noopDecorator;
 const SetMetadata = (_key, _val) => noopDecorator();
 const Inject      = noopParamDecorator;
 const createParamDecorator = (_fn) => noopDecorator();
+
+const Controller  = (_path) => noopDecorator();
+const Post        = (_path) => noopDecorator();
+const Get         = (_path) => noopDecorator();
+const Put         = (_path) => noopDecorator();
+const Patch       = (_path) => noopDecorator();
+const Delete      = (_path) => noopDecorator();
+const HttpCode    = (_code) => noopDecorator();
+const Body        = noopParamDecorator;
+const Param       = noopParamDecorator;
+const Query       = noopParamDecorator;
+const Headers     = noopParamDecorator;
+const Req         = noopParamDecorator;
+const Res         = noopParamDecorator;
+
+const UseGuards        = (..._guards) => noopDecorator();
+const UsePipes         = (..._pipes) => noopDecorator();
+const UseInterceptors  = (..._interceptors) => noopDecorator();
+const UseFilters       = (..._filters) => noopDecorator();
+const Module           = (_metadata) => noopDecorator();
+
+const HttpStatus = {
+  OK: 200,
+  CREATED: 201,
+  ACCEPTED: 202,
+  NO_CONTENT: 204,
+  BAD_REQUEST: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  CONFLICT: 409,
+  UNPROCESSABLE_ENTITY: 422,
+  INTERNAL_SERVER_ERROR: 500,
+};
 
 // --- Base classes ---
 class Logger {
@@ -64,10 +99,32 @@ class ValidationPipe {
 module.exports = {
   // Decorators
   Injectable,
+  Global,
   Catch,
   SetMetadata,
   Inject,
   createParamDecorator,
+  Controller,
+  Post,
+  Get,
+  Put,
+  Patch,
+  Delete,
+  HttpCode,
+  Body,
+  Param,
+  Query,
+  Headers,
+  Req,
+  Res,
+  UseGuards,
+  UsePipes,
+  UseInterceptors,
+  UseFilters,
+  Module,
+
+  // Enums & Constants
+  HttpStatus,
 
   // Classes
   Logger,

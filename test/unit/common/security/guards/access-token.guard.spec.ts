@@ -14,7 +14,10 @@ describe('AccessTokenGuard', () => {
 
   beforeEach(() => {
     mockReflector = { getAllAndOverride: jest.fn() };
-    mockTokenService = { verifyAccessToken: jest.fn() };
+    mockTokenService = {
+      verifyAccessToken: jest.fn(),
+      signAccessToken: jest.fn(),
+    };
     guard = new AccessTokenGuard(
       mockReflector as unknown as Reflector,
       mockTokenService,

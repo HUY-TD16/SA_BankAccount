@@ -14,9 +14,9 @@ describe('ResolveRecipientUseCase', () => {
     test('tra cứu qua adapter và giữ số 0 đầu tài khoản', async () => {
         const facade: AccountsFacade = {
             findByAccountNumber: jest.fn(async () => ({
-                id: '10',
+                id: '550e8400-e29b-41d4-a716-446655440010',
                 accountNumber: '0012345678',
-                currency: 'VND',
+                currency: 'VND' as const,
                 status: 'ACTIVE' as const,
         })),
     };
@@ -32,7 +32,7 @@ describe('ResolveRecipientUseCase', () => {
         .toHaveBeenCalledWith('0012345678');
 
     expect(result).toEqual({
-        accountId: '10',
+        accountId: '550e8400-e29b-41d4-a716-446655440010',
         accountNumber: '0012345678',
         currency: 'VND',
         status: 'ACTIVE',

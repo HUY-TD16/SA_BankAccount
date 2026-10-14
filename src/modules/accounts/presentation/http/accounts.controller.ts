@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Query,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -23,6 +24,7 @@ import type { AccessTokenPayload } from '@src/common/security/ports/token-servic
 import { GetAccountUseCase } from '../../application/use-cases/get-account.use-case';
 import { ListAccountsUseCase } from '../../application/use-cases/list-accounts.use-case';
 import { OpenAccountUseCase } from '../../application/use-cases/open-account.use-case';
+import {CloseAccountUseCase} from "../../application/use-cases/close-account.use-case";
 import type { BankAccount } from '../../domain/entities/bank-account.entity';
 
 import { AccountIdParamsDto } from './dto/account-id-params.dto';
@@ -51,6 +53,7 @@ export class AccountsController {
     private readonly openAccount: OpenAccountUseCase,
     private readonly listAccounts: ListAccountsUseCase,
     private readonly getAccount: GetAccountUseCase,
+    private readonly closeAccount: CloseAccountUseCase,
   ) {}
 
   @ApiOperation({ summary: 'Mở tài khoản' })
@@ -99,5 +102,20 @@ export class AccountsController {
     );
 
     return toAccountResponse(account);
+  }
+
+  @ApiOperation({ summary: 'Đóng tài khoản' })
+  @ApiParam({ name: 'accountId', description: 'UUID của tài khoản' })
+  @ApiResponse({ status: 204, description: 'Đóng tài khoản thành công' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse({ status: 404, description: 'Không tồn tại hoặc không sở hữu' })
+  @ApiResponse({ status: 409, description: 'Tài khoản vẫn còn số dư' })
+  @Delete(':accountId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async close(
+   @CurrentUser() user: AccessTokenPayload,
+    @Param() params: AccountIdParamsDto,
+  ): Promise<void> {
+    await this.closeAccount.execute(user.sub, params.accountId);
   }
 }

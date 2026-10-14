@@ -8,6 +8,7 @@ export function fakeAccountRepository(): jest.Mocked<AccountRepositoryPort> {
     findById: jest.fn(),
     findByAccountNumber: jest.fn(),
     listByOwner: jest.fn(),
+    closeIfZeroBalance: jest.fn(),
   };
 }
 

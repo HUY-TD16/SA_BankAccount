@@ -194,4 +194,52 @@ describe('PrismaAccountRepository with PostgreSQL', () => {
       accountA1.id,
     ]);
   });
+
+  it('closes a zero-balance account without deleting it', async () => {
+    const user = await createTestUser();
+    const account = await repository.createWithOpeningDeposit({
+      userId: user.id,
+      accountName: 'Close me',
+      accountType: 'PAYMENT',
+      initialDeposit: Money.zero(),
+    });
+
+    expect(
+      await repository.closeIfZeroBalance(account.id, user.id),
+    ).toBe(true);
+
+    const stored = await prisma.bankAccount.findUniqueOrThrow({
+      where: { id: account.id },
+    });
+
+    expect(stored.status).toBe('CLOSED');
+    expect(stored.closedAt).not.toBeNull();
+    expect(stored.currentBalance.toString()).toBe('0');
+  });
+
+  it('does not close an account with a non-zero balance', async () => {
+    const user = await createTestUser();
+    const account = await repository.createWithOpeningDeposit({
+      userId: user.id,
+      accountName: 'Still funded',
+      accountType: 'PAYMENT',
+      initialDeposit: Money.fromString('500000'),
+    });
+
+    expect(
+      await repository.closeIfZeroBalance(account.id, user.id),
+    ).toBe(false);
+
+    const stored = await prisma.bankAccount.findUniqueOrThrow({
+      where: { id: account.id },
+    });
+
+    expect(stored.status).toBe('ACTIVE');
+    expect(stored.closedAt).toBeNull();
+    expect(
+      await prisma.financialTransaction.count({
+        where: { accountId: account.id },
+      }),
+    ).toBe(1);
+  });
 });

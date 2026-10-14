@@ -160,6 +160,23 @@ export class PrismaAccountRepository
     };
   }
 
+  async closeIfZeroBalance(id: string, userId: string): Promise<boolean> {
+    const result = await this.prisma.bankAccount.updateMany({
+      where: {
+        id,
+        userId,
+        status: 'ACTIVE',
+        currentBalance: 0,
+      },
+      data: {
+        status: 'CLOSED',
+        closedAt: new Date(),
+      },
+    });
+
+    return result.count === 1;
+  }
+
   private toDomain(record: PrismaBankAccount): BankAccount {
     if (record.currency !== 'VND') {
       throw new Error('Unsupported account currency');

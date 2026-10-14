@@ -14,6 +14,7 @@ import { OpenAccountUseCase } from './application/use-cases/open-account.use-cas
 import { AccountLookupFacade } from './infrastructure/adapters/account-lookup.facade';
 import { PrismaAccountRepository } from './infrastructure/persistence/prisma-account.repository';
 import { AccountsController } from './presentation/http/accounts.controller';
+import { CloseAccountUseCase } from './application/use-cases/close-account.use-case';
 
 @Module({
   controllers: [AccountsController],
@@ -47,6 +48,12 @@ import { AccountsController } from './presentation/http/accounts.controller';
       provide: ACCOUNTS_FACADE,
       useFactory: (repository: AccountRepositoryPort): AccountsFacade =>
         new AccountLookupFacade(repository),
+      inject: [ACCOUNT_REPOSITORY],
+    },
+    {
+      provide: CloseAccountUseCase,
+      useFactory: (repository: AccountRepositoryPort) =>
+        new CloseAccountUseCase(repository),
       inject: [ACCOUNT_REPOSITORY],
     },
   ],

@@ -31,4 +31,6 @@ export interface AccountRepositoryPort {
                     limit: number;
                 },
             ): Promise<AccountPage>;
+
+    closeIfZeroBalance(id: string, userId: string): Promise<boolean>;
 }

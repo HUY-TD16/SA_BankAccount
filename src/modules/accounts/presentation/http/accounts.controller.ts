@@ -46,7 +46,7 @@ function toAccountResponse(account: BankAccount) {
 }
 
 @ApiTags('accounts')
-@ApiBearerAuth('bearerAuth')
+@ApiBearerAuth('access-token')
 @Controller('accounts')
 export class AccountsController {
   constructor(

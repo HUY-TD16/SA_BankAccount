@@ -8,7 +8,7 @@ import { WithdrawMoneyUseCase } from '../../application/use-cases/withdraw-money
 
 
 @ApiTags('transactions')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller('accounts') 
 export class TransactionController {
   constructor(

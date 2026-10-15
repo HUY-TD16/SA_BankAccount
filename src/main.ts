@@ -8,6 +8,7 @@ import {
 } from "@src/common/http/interceptors";
 import { createGlobalValidationPipe } from "@src/common/http/pipes";
 import { LoggerService } from "@src/common/observability";
+import { setupSwagger } from "@src/common/http/swagger/swagger.config";
 
 async function bootstrap() {
   // bufferLogs: true để log trong lúc khởi động (trước khi LoggerService sẵn sàng)
@@ -25,6 +26,9 @@ async function bootstrap() {
   );
   app.useGlobalPipes(createGlobalValidationPipe());
   app.enableShutdownHooks();
+
+  // Setup Swagger UI & OpenAPI JSON spec
+  setupSwagger(app);
 
   await app.listen(process.env.PORT ?? 3000);
 }

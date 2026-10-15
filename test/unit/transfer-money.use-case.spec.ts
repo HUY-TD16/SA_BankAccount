@@ -27,11 +27,13 @@ describe('TransferMoneyUseCase', () => {
       status: 'ACTIVE'
     });
 
-    const request = new TransferMoneyDto();
-    request.sourceAccountId = 'ACCOUNT_A';
-    request.destinationAccountId = 'ACCOUNT_B';
-    request.amount = '100000'; 
-    request.idempotencyKey = 'idem-key-123';
+    const request = {
+      sourceAccountId: 'ACCOUNT_A',
+      destinationAccountId: 'ACCOUNT_B',
+      amount: '100000',
+      idempotencyKey: 'idem-key-123',
+      initiatedByUserId: 'User_1',
+    };
 
     await expect(useCase.execute(request)).rejects.toThrow('InsufficientFundsError');
   })

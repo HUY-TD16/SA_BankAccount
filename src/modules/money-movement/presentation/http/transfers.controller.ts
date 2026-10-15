@@ -6,7 +6,7 @@ import { TransferMoneyDto } from './dto/transfer-money.dto';
 import { TransferMoneyUseCase } from '../../application/use-cases/transfer-money.use-case';
 
 @ApiTags('transfers')
-@ApiBearerAuth()
+@ApiBearerAuth('access-token')
 @Controller('transfers')
 export class TransfersController {
   constructor(

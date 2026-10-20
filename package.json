@@ -11,7 +11,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "build": "nest build",
+    "build": "nest build && tsc-alias",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
@@ -54,6 +54,7 @@
     "@types/node": "^26.6.2",
     "@types/pg": "^8.23.1",
     "jest": "^30.5.2",
-    "ts-jest": "^29.4.12"
+    "ts-jest": "^29.4.12",
+    "tsc-alias": "^1.9.8"
   }
 }

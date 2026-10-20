@@ -1,3 +1,5 @@
+import { successResponse, errorResponse } from '@src/common/http/swagger/response.schemas';
+import { userResponseSchema, loginResponseSchema } from './dto/auth-response.schema';
 // src/modules/identity/presentation/http/auth.controller.ts
 import { Body, Controller, HttpCode, HttpStatus, Post } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
@@ -7,7 +9,9 @@ import { LoginDto } from "./dto/login.dto";
 import { RegisterUserUseCase } from "../../application/use-cases/register-user.use-case";
 import { LoginUseCase } from "../../application/use-cases/login.use-case";
 
-@ApiTags("auth")
+@ApiTags('Identity')
+@ApiResponse(errorResponse(400, 'VALIDATION_ERROR: dữ liệu đầu vào không hợp lệ.'))
+@ApiResponse(errorResponse(500, 'INTERNAL_ERROR: lỗi nội bộ hệ thống.'))
 @Controller("auth")
 export class AuthController {
   constructor(
@@ -16,9 +20,9 @@ export class AuthController {
   ) {}
 
   @ApiOperation({ summary: "Dang ky user moi" })
-  @ApiResponse({ status: 201, description: "Tao user thanh cong" })
-  @ApiResponse({ status: 400, description: "Du lieu khong hop le" })
-  @ApiResponse({ status: 409, description: "Email da ton tai" })
+  @ApiResponse(successResponse(201, "Tao user thanh cong", userResponseSchema))
+  @ApiResponse(errorResponse(400, "VALIDATION_ERROR: Du lieu khong hop le"))
+  @ApiResponse(errorResponse(409, "EMAIL_EXISTS: Email da ton tai"))
   @Public() // BAT BUOC - thieu dong nay se bi AccessTokenGuard chan 401
   @Post("register")
   @HttpCode(HttpStatus.CREATED)
@@ -29,8 +33,8 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: "Dang nhap, nhan JWT access token" })
-  @ApiResponse({ status: 200, description: "Dang nhap thanh cong" })
-  @ApiResponse({ status: 401, description: "Email hoac mat khau khong dung" })
+  @ApiResponse(successResponse(200, "Dang nhap thanh cong", loginResponseSchema))
+  @ApiResponse(errorResponse(401, "INVALID_CREDENTIALS: Email hoac mat khau khong dung"))
   @Public()
   @Post("login")
   @HttpCode(HttpStatus.OK)

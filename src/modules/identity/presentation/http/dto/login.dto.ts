@@ -3,12 +3,12 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsEmail, IsNotEmpty, MaxLength } from "class-validator";
 
 export class LoginDto {
-  @ApiProperty({ example: "customer@example.com" })
+  @ApiProperty({ format: "email", maxLength: 254, example: "customer@example.com" })
   @IsEmail()
   @MaxLength(254)
   email!: string;
 
-  @ApiProperty({ example: "Abcdef1!" })
+  @ApiProperty({ format: "password", writeOnly: true, example: "Abcdef1!x" })
   @IsNotEmpty()
   password!: string;
   // KHONG them regex/do dai o day - neu them, loi 400 "password sai dinh dang" se vo

@@ -1,3 +1,5 @@
+import { successResponse, errorResponse } from '@src/common/http/swagger/response.schemas';
+import { accountResponseSchema } from './dto/account-response.schema';
 import {
   Body,
   Controller,
@@ -45,8 +47,11 @@ function toAccountResponse(account: BankAccount) {
   };
 }
 
-@ApiTags('accounts')
+@ApiTags('Accounts')
 @ApiBearerAuth('access-token')
+@ApiResponse(errorResponse(400, 'VALIDATION_ERROR: dữ liệu đầu vào không hợp lệ.'))
+@ApiResponse(errorResponse(500, 'INTERNAL_ERROR: lỗi nội bộ hệ thống.'))
+@ApiResponse(errorResponse(401, 'UNAUTHORIZED: thiếu hoặc không chấp nhận access token.'))
 @Controller('accounts')
 export class AccountsController {
   constructor(
@@ -57,9 +62,9 @@ export class AccountsController {
   ) {}
 
   @ApiOperation({ summary: 'Mở tài khoản' })
-  @ApiResponse({ status: 201, description: 'Tạo tài khoản thành công' })
-  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
-  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  @ApiResponse(successResponse(201, 'Tạo tài khoản thành công', accountResponseSchema))
+  @ApiResponse(errorResponse(400, 'VALIDATION_ERROR: Dữ liệu không hợp lệ'))
+  @ApiResponse(errorResponse(401, 'UNAUTHORIZED: Thiếu hoặc không chấp nhận access token'))
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(
@@ -71,7 +76,7 @@ export class AccountsController {
   }
 
   @ApiOperation({ summary: 'Liệt kê tài khoản của tôi' })
-  @ApiResponse({ status: 200, description: 'Danh sách có phân trang' })
+  @ApiResponse(successResponse(200, 'Danh sách có phân trang', accountResponseSchema, true))
   @Get()
   async list(
     @CurrentUser() user: AccessTokenPayload,
@@ -88,9 +93,9 @@ export class AccountsController {
   }
 
   @ApiOperation({ summary: 'Xem chi tiết tài khoản của tôi' })
-  @ApiParam({ name: 'accountId', description: 'UUID của tài khoản' })
-  @ApiResponse({ status: 200, description: 'Chi tiết tài khoản' })
-  @ApiResponse({ status: 404, description: 'Không tồn tại hoặc không sở hữu' })
+  @ApiParam({ name: 'accountId', description: 'UUID v4 của tài khoản', format: 'uuid' })
+  @ApiResponse(successResponse(200, 'Chi tiết tài khoản', accountResponseSchema))
+  @ApiResponse(errorResponse(404, 'ACCOUNT_NOT_FOUND: Không tồn tại hoặc không sở hữu'))
   @Get(':accountId')
   async get(
     @CurrentUser() user: AccessTokenPayload,
@@ -105,11 +110,11 @@ export class AccountsController {
   }
 
   @ApiOperation({ summary: 'Đóng tài khoản' })
-  @ApiParam({ name: 'accountId', description: 'UUID của tài khoản' })
-  @ApiResponse({ status: 204, description: 'Đóng tài khoản thành công' })
-  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
-  @ApiResponse({ status: 404, description: 'Không tồn tại hoặc không sở hữu' })
-  @ApiResponse({ status: 409, description: 'Tài khoản vẫn còn số dư' })
+  @ApiParam({ name: 'accountId', description: 'UUID v4 của tài khoản', format: 'uuid' })
+  @ApiResponse(successResponse(204, 'Đóng tài khoản thành công'))
+  @ApiResponse(errorResponse(401, 'UNAUTHORIZED: Thiếu hoặc không chấp nhận access token'))
+  @ApiResponse(errorResponse(404, 'ACCOUNT_NOT_FOUND: Không tồn tại hoặc không sở hữu'))
+  @ApiResponse(errorResponse(409, 'ACCOUNT_HAS_BALANCE: Tài khoản vẫn còn số dư'))
   @Delete(':accountId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async close(

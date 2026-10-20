@@ -8,7 +8,7 @@ export function setupSwagger(app: INestApplication): void {
     const config = new DocumentBuilder()
       .setTitle("SA Bank Account API")
       .setDescription(
-        "API documentation for SA Bank Account System - Phase 1 (Identity, Accounts, Money Movement)",
+        "SA Bank Account API — Identity, Accounts, Money Movement. Đăng ký và đăng nhập để lấy data.accessToken, sau đó nhập token vào Authorize (không thêm Bearer). Tiền VND dùng chuỗi số nguyên. Response thành công có success/data/meta; danh sách thêm pagination. Lỗi có success/error/meta. X-Request-Id dùng để truy vết. Đóng tài khoản trả 204, body rỗng.",
       )
       .setVersion("1.0.0")
       .addServer("/", "Current server")

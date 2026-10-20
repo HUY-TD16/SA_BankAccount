@@ -11,7 +11,7 @@ export class CreateTransactionDto {
     @IsEnum(TransactionTypeDto, { message: 'Type must be either CREDIT or DEBIT' })
     type!: TransactionTypeDto;
 
-    @ApiProperty({ example: '100000', description: 'Transaction amount (Must be a positive integer string)' })
+    @ApiProperty({ type: String, pattern: '^[1-9]\\d*$', example: '100000', description: 'Transaction amount (Must be a positive integer string)' })
     @IsNumberString({}, { message: 'Amount must be a numeric string' })
     @Matches(/^[1-9]\d*$/, { message: 'Amount must be greater than 0 and cannot start with zero' })
     amount!: string;

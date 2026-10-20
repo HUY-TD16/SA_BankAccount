@@ -1,3 +1,5 @@
+import { successResponse, errorResponse } from '@src/common/http/swagger/response.schemas';
+import { transferResponseSchema } from './dto/money-movement-response.schema';
 import { 
   Body, 
   Controller, 
@@ -14,8 +16,11 @@ import { AccessTokenPayload } from '../../../../common/security/ports';
 import { TransferMoneyDto } from './dto/transfer-money.dto';
 import { TransferMoneyUseCase } from '../../application/use-cases/transfer-money.use-case';
 
-@ApiTags('transfers')
+@ApiTags('Money Movement')
 @ApiBearerAuth('access-token')
+@ApiResponse(errorResponse(400, 'VALIDATION_ERROR: dữ liệu đầu vào không hợp lệ.'))
+@ApiResponse(errorResponse(500, 'INTERNAL_ERROR: lỗi nội bộ hệ thống.'))
+@ApiResponse(errorResponse(401, 'UNAUTHORIZED: thiếu hoặc không chấp nhận access token.'))
 @Controller('transfers')
 export class TransfersController {
   constructor(
@@ -25,14 +30,15 @@ export class TransfersController {
   @ApiOperation({ summary: 'Transfer money between two accounts (UC-08)' })
   @ApiHeader({
     name: 'Idempotency-Key',
-    description: 'Unique UUID key in header to guarantee transfer idempotency',
+    description: 'Khóa không rỗng do client tạo; được trim và dùng cùng tài khoản nguồn để nhận lại kết quả giao dịch trước đó. Khi thử lại, gửi cùng khóa và payload.',
     required: true,
+    schema: { type: 'string', minLength: 1, example: 'transfer-20261020-001' },
   })
-  @ApiResponse({ status: 201, description: 'Transfer successfully created' })
-  @ApiResponse({ status: 200, description: 'Replay of existing transfer with identical Idempotency-Key' })
-  @ApiResponse({ status: 400, description: 'Invalid input data or missing Idempotency-Key header' })
-  @ApiResponse({ status: 404, description: 'Source or destination account not found' })
-  @ApiResponse({ status: 409, description: 'Insufficient funds, closed account, or duplicate key conflict' })
+  @ApiResponse(successResponse(201, 'Transfer successfully created', transferResponseSchema))
+  @ApiResponse(successResponse(200, 'Replay of existing transfer with identical Idempotency-Key', transferResponseSchema))
+  @ApiResponse(errorResponse(400, 'VALIDATION_ERROR, SAME_ACCOUNT_TRANSFER hoặc HTTP_ERROR khi thiếu Idempotency-Key'))
+  @ApiResponse(errorResponse(404, 'ACCOUNT_NOT_FOUND: Source or destination account not found'))
+  @ApiResponse(errorResponse(409, 'INSUFFICIENT_FUNDS hoặc ACCOUNT_NOT_ACTIVE'))
   @Post()
   async transfer(
     @Body() dto: TransferMoneyDto,

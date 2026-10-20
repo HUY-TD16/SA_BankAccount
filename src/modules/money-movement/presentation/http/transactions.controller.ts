@@ -1,3 +1,5 @@
+import { successResponse, errorResponse } from '@src/common/http/swagger/response.schemas';
+import { transactionResponseSchema } from './dto/money-movement-response.schema';
 import { 
   Body, 
   Controller, 
@@ -18,8 +20,11 @@ import { DepositMoneyUseCase } from '../../application/use-cases/deposit-money.u
 import { WithdrawMoneyUseCase } from '../../application/use-cases/withdraw-money.use-case';
 import { GetTransactionHistoryUseCase } from '../../application/use-cases/get-transaction-history.use-case';
 
-@ApiTags('transactions')
+@ApiTags('Money Movement')
 @ApiBearerAuth('access-token')
+@ApiResponse(errorResponse(400, 'VALIDATION_ERROR: dữ liệu đầu vào không hợp lệ.'))
+@ApiResponse(errorResponse(500, 'INTERNAL_ERROR: lỗi nội bộ hệ thống.'))
+@ApiResponse(errorResponse(401, 'UNAUTHORIZED: thiếu hoặc không chấp nhận access token.'))
 @Controller('accounts') 
 export class TransactionController {
   constructor(
@@ -29,10 +34,11 @@ export class TransactionController {
   ) {}
 
   @ApiOperation({ summary: 'Create a deposit or withdrawal transaction (UC-05, UC-06)' })
-  @ApiResponse({ status: 201, description: 'Transaction executed successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid amount or transaction type' })
-  @ApiResponse({ status: 404, description: 'Account not found or not owned by user' })
-  @ApiResponse({ status: 409, description: 'Insufficient funds or account closed' })
+  @ApiResponse(successResponse(201, 'Transaction executed successfully', transactionResponseSchema))
+  @ApiResponse(errorResponse(400, 'VALIDATION_ERROR: Invalid amount or transaction type'))
+  @ApiResponse(errorResponse(404, 'ACCOUNT_NOT_FOUND: Account not found or not owned by user'))
+  @ApiResponse(errorResponse(409, 'INSUFFICIENT_FUNDS hoặc ACCOUNT_NOT_ACTIVE'))
+  @ApiParam({ name: 'accountId', description: 'UUID of the bank account', format: 'uuid' })
   @Post(':accountId/transactions')
   @HttpCode(HttpStatus.CREATED)
   async createTransaction(
@@ -58,9 +64,9 @@ export class TransactionController {
   }
 
   @ApiOperation({ summary: 'Get paginated transaction history with filters (UC-06)' })
-  @ApiParam({ name: 'accountId', description: 'UUID of the bank account' })
-  @ApiResponse({ status: 200, description: 'Paginated list of transactions' })
-  @ApiResponse({ status: 404, description: 'Account not found or not owned by authenticated user' })
+  @ApiParam({ name: 'accountId', description: 'UUID of the bank account', format: 'uuid' })
+  @ApiResponse(successResponse(200, 'Paginated list of transactions', transactionResponseSchema, true))
+  @ApiResponse(errorResponse(404, 'ACCOUNT_NOT_FOUND: Account not found or not owned by authenticated user'))
   @Get(':accountId/transactions')
   async getTransactions(
     @Param('accountId') accountId: string,

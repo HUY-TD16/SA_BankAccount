@@ -10,6 +10,7 @@ module.exports = {
   ApiOperation: noopDecorator,
   ApiResponse: noopDecorator,
   ApiProperty: noopDecorator,
+  ApiPropertyOptional: noopDecorator,
   ApiBearerAuth: noopDecorator,
   ApiHeader: noopDecorator,
   ApiParam: noopDecorator,
@@ -23,6 +24,8 @@ module.exports = {
     setTitle() { return this; }
     setDescription() { return this; }
     setVersion() { return this; }
+    addServer() { return this; }
+    addTag() { return this; }
     addBearerAuth() { return this; }
     build() { return {}; }
   },

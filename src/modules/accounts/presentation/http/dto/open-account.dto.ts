@@ -7,7 +7,7 @@ import {
 } from '../../../domain/enums/account-type';
 
 export class OpenAccountDto {
-  @ApiProperty({ example: 'Tài khoản thanh toán' })
+  @ApiProperty({ example: 'Tài khoản thanh toán', description: 'Tên sau khi trim phải dài 1–100 ký tự.' })
   @IsString()
   accountName!: string;
 
@@ -16,8 +16,8 @@ export class OpenAccountDto {
   accountType!: AccountType;
 
   @ApiProperty({
-    example: '500000',
-    description: 'Số nguyên VND không âm, truyền dưới dạng chuỗi',
+    type: String, pattern: '^\\d+$', example: '500000',
+    description: 'Số nguyên VND từ 0 đến 999999999999999999, truyền dưới dạng chuỗi',
   })
   @IsString()
   @Matches(/^\d+$/)

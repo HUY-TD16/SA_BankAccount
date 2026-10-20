@@ -21,14 +21,14 @@ export class ListAccountsQueryDto {
   @IsIn([...ACCOUNT_STATUSES])
   status?: AccountStatus;
 
-  @ApiPropertyOptional({ example: 1, default: 1 })
+  @ApiPropertyOptional({ type: 'integer', minimum: 1, example: 1, default: 1 })
   @IsOptional()
   @Transform(({ value }) => parsePositiveInteger(value))
   @IsInt()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ example: 20, default: 20 })
+  @ApiPropertyOptional({ type: 'integer', minimum: 1, maximum: 100, example: 20, default: 20 })
   @IsOptional()
   @Transform(({ value }) => parsePositiveInteger(value))
   @IsInt()

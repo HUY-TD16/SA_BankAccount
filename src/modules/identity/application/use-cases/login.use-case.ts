@@ -1,9 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
-import { TOKEN_SERVICE, TokenServicePort } from "@src/common/security/ports";
-import {
-  USER_REPOSITORY,
+import type { TokenServicePort } from "@src/common/security/ports";
+import type {
   UserRepositoryPort,
-  PASSWORD_HASHER,
   PasswordHasherPort,
 } from "@src/modules/identity/application/ports";
 import { InvalidCredentialsError } from "@src/modules/identity/domain/errors";
@@ -17,14 +14,11 @@ export interface LoginCommand {
 const DUMMY_HASH =
   "$2b$12$CwTycUXWue0Thq9StjUM0uJ8i6ByfLwqOAn9d.Xz3.dK5xj5v5x5e";
 
-@Injectable()
 export class LoginUseCase {
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepositoryPort,
-    @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,
-    @Inject(TOKEN_SERVICE) private readonly tokenService: TokenServicePort,
+    private readonly tokenService: TokenServicePort,
   ) {}
 
   async execute(dto: LoginCommand) {

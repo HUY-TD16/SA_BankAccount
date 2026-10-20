@@ -1,9 +1,6 @@
-import { Inject, Injectable } from "@nestjs/common";
 import { ValidationError } from "@src/common/domain/errors";
-import {
-  USER_REPOSITORY,
+import type {
   UserRepositoryPort,
-  PASSWORD_HASHER,
   PasswordHasherPort,
 } from "@src/modules/identity/application/ports";
 import { EmailAlreadyExistsError } from "@src/modules/identity/domain/errors";
@@ -15,12 +12,9 @@ export interface RegisterUserCommand {
   confirmPassword: string;
 }
 
-@Injectable()
 export class RegisterUserUseCase {
   constructor(
-    @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepositoryPort,
-    @Inject(PASSWORD_HASHER)
     private readonly passwordHasher: PasswordHasherPort,
   ) {}
 

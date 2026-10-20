@@ -19,6 +19,14 @@ export class FakeUnitOfWork implements UnitOfWorkPort {
           lockForUpdate: async (accountId) => {
             return this.accountsDb.get(accountId) || null;
           },
+          findByAccountNumber: async (accountNumber) => {
+            for (const acc of this.accountsDb.values()) {
+              if (acc.accountNumber === accountNumber) {
+                return acc;
+              }
+            }
+            return null;
+          },
           updateBalance: async(accountId, newBalance) => {
             const acc = this.accountsDb.get(accountId);
             if (acc) {

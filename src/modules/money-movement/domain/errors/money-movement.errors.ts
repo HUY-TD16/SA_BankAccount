@@ -1,6 +1,5 @@
 import { AppError, ErrorDetail } from '../../../../common/domain/errors/app.error';
 
-
 export class InsufficientFundsError extends AppError {
   readonly errorCode = 'INSUFFICIENT_FUNDS';
   readonly httpStatus = 409;
@@ -21,7 +20,6 @@ export class AccountNotFoundError extends AppError {
     super(message);
   }
 }
-
 
 export class AccountClosedError extends AppError {
   readonly errorCode = 'ACCOUNT_NOT_ACTIVE';

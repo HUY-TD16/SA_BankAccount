@@ -18,7 +18,7 @@ export class TransferMoneyDto {
   @IsNotEmpty()
   amount!: string;
 
-  @ApiPropertyOptional({ example: 'Tien an trua', description: 'Transfer description (Optional)' })
+  @ApiPropertyOptional({ example: 'Lunch payment', description: 'Transfer description (Optional)' })
   @IsOptional()
   @IsString()
   description?: string;

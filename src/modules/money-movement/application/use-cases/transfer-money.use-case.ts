@@ -13,7 +13,7 @@ import {
 
 export interface TransferMoneyCommand {
   sourceAccountId: string;
-  destinationAccountNumber: string; 
+  destinationAccountNumber: string;
   initiatedByUserId: string; 
   amount: string;
   idempotencyKey: string;   
@@ -36,7 +36,6 @@ export class TransferMoneyUseCase {
         throw new SameSourceDestinationError();
       }
 
-
       const [firstId, secondId] = 
         command.sourceAccountId < destSnapshot.id
           ? [command.sourceAccountId, destSnapshot.id]
@@ -47,7 +46,6 @@ export class TransferMoneyUseCase {
 
       const sourceAccount = firstId === command.sourceAccountId ? firstAccount : secondAccount;
       const destAccount = firstId === command.sourceAccountId ? secondAccount : firstAccount;
-
 
       if (!sourceAccount || sourceAccount.userId !== command.initiatedByUserId) {
         throw new AccountNotFoundError('Source account not found'); 

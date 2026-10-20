@@ -65,7 +65,7 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
       accountId: account.id,
       userId: testUserId,
       amount: '500000',
-      description: 'Nạp tiền kiểm thử',
+      description: 'Integration test deposit',
     });
 
     const updatedAccount = await prisma.bankAccount.findUnique({
@@ -89,7 +89,7 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
       accountId: account.id,
       userId: testUserId,
       amount: '200000',
-      description: 'Rút tiền hợp lệ',
+      description: 'Valid withdrawal',
     });
 
     let updatedAccount = await prisma.bankAccount.findUnique({
@@ -101,7 +101,7 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
         accountId: account.id,
         userId: testUserId,
         amount: '400000',
-        description: 'Rút quá số dư',
+        description: 'Overdraft withdrawal',
       }),
     ).rejects.toThrow();
 
@@ -118,13 +118,13 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
         accountId: account.id,
         userId: testUserId,
         amount: '100000',
-        description: 'Tiến trình rút 1',
+        description: 'Concurrent withdrawal 1',
       }),
       withdrawUseCase.execute({
         accountId: account.id,
         userId: testUserId,
         amount: '100000',
-        description: 'Tiến trình rút 2',
+        description: 'Concurrent withdrawal 2',
       }),
     ]);
 
@@ -140,25 +140,25 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
   });
 
 
-  it('UC-08: should prevent deadlock when bidirectional concurrent transfers occur', async () => {
+    it('UC-08: should prevent deadlock when bidirectional concurrent transfers occur', async () => {
     const accountA = await createTestAccount('500000');
     const accountB = await createTestAccount('500000');
     await Promise.all([
       transferUseCase.execute({
         sourceAccountId: accountA.id,
-        destinationAccountId: accountB.id,
+        destinationAccountNumber: accountB.accountNumber,
         initiatedByUserId: testUserId,
         amount: '100000',
         idempotencyKey: 'idemp-deadlock-test-1',
-        description: 'A chuyển B 100k',
+        description: 'Transfer A to B 100k',
       }),
       transferUseCase.execute({
         sourceAccountId: accountB.id,
-        destinationAccountId: accountA.id,
+        destinationAccountNumber: accountA.accountNumber,
         initiatedByUserId: testUserId,
         amount: '200000',
         idempotencyKey: 'idemp-deadlock-test-2',
-        description: 'B chuyển A 200k',
+        description: 'Transfer B to A 200k',
       }),
     ]);
 
@@ -167,11 +167,9 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
     expect(updatedA?.currentBalance.toString()).toBe('600000');
     expect(updatedB?.currentBalance.toString()).toBe('400000');
 
-
     const totalBalance = BigInt(updatedA!.currentBalance.toString()) + BigInt(updatedB!.currentBalance.toString());
     expect(totalBalance.toString()).toBe('1000000');
   });
-
 
   it('UC-08: should guarantee idempotency and not duplicate transfer on retry', async () => {
     const source = await createTestAccount('500000');
@@ -179,18 +177,20 @@ describe('Money Movement Integration Tests (Real Postgres)', () => {
     const idempotencyKey = 'idemp-retry-test-unique-key-999';
     const command = {
       sourceAccountId: source.id,
-      destinationAccountId: destination.id,
+      destinationAccountNumber: destination.accountNumber,
       initiatedByUserId: testUserId,
       amount: '150000',
       idempotencyKey: idempotencyKey,
-      description: 'Chuyển tiền kiểm thử idempotency',
+      description: 'Idempotency integration test',
     };
 
     const firstResult = await transferUseCase.execute(command);
-    expect(firstResult).toBeDefined();
+    expect(firstResult.isReplay).toBe(false);
+    expect(firstResult.transfer).toBeDefined();
 
     const secondResult = await transferUseCase.execute(command);
-    expect(secondResult.id).toBe(firstResult.id);
+    expect(secondResult.isReplay).toBe(true);
+    expect(secondResult.transfer.id).toBe(firstResult.transfer.id);
 
     const updatedSource = await prisma.bankAccount.findUnique({ where: { id: source.id } });
     const updatedDest = await prisma.bankAccount.findUnique({ where: { id: destination.id } });

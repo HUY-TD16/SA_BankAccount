@@ -9,11 +9,10 @@ export type TransactionReferenceType =
   | "TRANSFER_IN"
   | "TRANSFER_OUT";
 
-/** Shape tối thiểu của account cần cho nạp/rút/transfer — không phải toàn bộ entity. */
 export interface AccountSnapshot {
   id: string;
   userId: string;
-  currentBalance: string; // string nguyên VND, không phải number — đúng quy ước Money
+  currentBalance: string;
   status: "ACTIVE" | "CLOSED";
   accountNumber?: string;
 }
@@ -62,18 +61,15 @@ export interface TransferRecord {
   createdAt: Date;
 }
 
-/**
- * Context được cấp bên trong một database transaction đang chạy.
- * Use case chỉ được thao tác dữ liệu thông qua các method này.
- */
+export interface TransferExecutionResult {
+  transfer: TransferRecord;
+  isReplay: boolean;
+}
+
 export interface MoneyMovementTransactionContext {
   accounts: {
-    /** SELECT ... FOR UPDATE — khóa row, dùng trước mọi thao tác trừ/cộng tiền. */
     lockForUpdate(accountId: string): Promise<AccountSnapshot | null>;
-
     findByAccountNumber(accountNumber: string): Promise<AccountSnapshot | null>;
-
-    /** Cập nhật current_balance. Chỉ gọi sau khi đã lockForUpdate trong cùng transaction. */
     updateBalance(accountId: string, newBalance: string): Promise<void>;
   };
 
@@ -82,7 +78,6 @@ export interface MoneyMovementTransactionContext {
   };
 
   transfers: {
-    /** Dùng để kiểm tra idempotency key trước khi tạo transfer mới. */
     findBySourceAndIdempotencyKey(
       sourceAccountId: string,
       idempotencyKey: string,
@@ -92,19 +87,7 @@ export interface MoneyMovementTransactionContext {
   };
 }
 
-export interface TransferExecutionResult {
-  transfer: TransferRecord;
-  isReplay: boolean;
-}
-
 export interface UnitOfWorkPort {
-  /**
-   * Chạy `work` bên trong một database transaction duy nhất.
-   * Nếu `work` throw (kể cả AppError nghiệp vụ như InsufficientFundsError),
-   * toàn bộ thay đổi trong transaction phải rollback — implementation chịu
-   * trách nhiệm đảm bảo điều này (PrismaUnitOfWork dựa vào prisma.$transaction
-   * tự rollback khi promise reject).
-   */
   execute<T>(
     work: (ctx: MoneyMovementTransactionContext) => Promise<T>,
   ): Promise<T>;

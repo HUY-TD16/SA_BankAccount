@@ -1,4 +1,13 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, BadRequestException, Headers} from '@nestjs/common';
+import { 
+  Body, 
+  Controller, 
+  Post, 
+  Headers, 
+  Res, 
+  HttpStatus, 
+  BadRequestException 
+} from '@nestjs/common';
+import { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiHeader } from '@nestjs/swagger';
 import { CurrentUser } from '../../../../common/security/decorators';
 import { AccessTokenPayload } from '../../../../common/security/ports';
@@ -16,34 +25,40 @@ export class TransfersController {
   @ApiOperation({ summary: 'Transfer money between two accounts (UC-08)' })
   @ApiHeader({
     name: 'Idempotency-Key',
-    description: 'Unique UUID key to prevent duplicate transfers',
-    required: false,
+    description: 'Unique UUID key in header to guarantee transfer idempotency',
+    required: true,
   })
-  @ApiResponse({ status: 201, description: 'Transfer successful' })
-  @ApiResponse({ status: 400, description: 'Invalid input data' })
-  @ApiResponse({ status: 404, description: 'Account not found' })
-  @ApiResponse({ status: 409, description: 'Insufficient funds or duplicate transaction' })
+  @ApiResponse({ status: 201, description: 'Transfer successfully created' })
+  @ApiResponse({ status: 200, description: 'Replay of existing transfer with identical Idempotency-Key' })
+  @ApiResponse({ status: 400, description: 'Invalid input data or missing Idempotency-Key header' })
+  @ApiResponse({ status: 404, description: 'Source or destination account not found' })
+  @ApiResponse({ status: 409, description: 'Insufficient funds, closed account, or duplicate key conflict' })
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   async transfer(
     @Body() dto: TransferMoneyDto,
     @CurrentUser() user: AccessTokenPayload,
-    @Headers('idempotency-key') idempotencyHeader?: string,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    const idempotencyKey = idempotencyHeader || dto.idempotencyKey;
-    if (!idempotencyKey) {
-      throw new BadRequestException('Idempotency-Key is required (either in Header or Body)');
+    if (!idempotencyKey || idempotencyKey.trim().length === 0) {
+      throw new BadRequestException('Idempotency-Key header is required');
     }
 
-    return this.transferMoneyUseCase.execute({
+    const result = await this.transferMoneyUseCase.execute({
       sourceAccountId: dto.sourceAccountId,
-      destinationAccountId: dto.destinationAccountId,
+      destinationAccountNumber: dto.destinationAccountNumber,
       amount: dto.amount,
       description: dto.description,
       initiatedByUserId: user.sub,
-      idempotencyKey: idempotencyKey,
+      idempotencyKey: idempotencyKey.trim(),
     });
-  } 
+
+    if (result.isReplay) {
+      res.status(HttpStatus.OK);
+    } else {
+      res.status(HttpStatus.CREATED);
+    }
+
+    return result.transfer;
+  }
 }
-
-

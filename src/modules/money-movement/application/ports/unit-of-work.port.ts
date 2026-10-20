@@ -15,6 +15,7 @@ export interface AccountSnapshot {
   userId: string;
   currentBalance: string; // string nguyên VND, không phải number — đúng quy ước Money
   status: "ACTIVE" | "CLOSED";
+  accountNumber?: string;
 }
 
 export interface CreateTransactionEntryInput {
@@ -70,6 +71,8 @@ export interface MoneyMovementTransactionContext {
     /** SELECT ... FOR UPDATE — khóa row, dùng trước mọi thao tác trừ/cộng tiền. */
     lockForUpdate(accountId: string): Promise<AccountSnapshot | null>;
 
+    findByAccountNumber(accountNumber: string): Promise<AccountSnapshot | null>;
+
     /** Cập nhật current_balance. Chỉ gọi sau khi đã lockForUpdate trong cùng transaction. */
     updateBalance(accountId: string, newBalance: string): Promise<void>;
   };
@@ -87,6 +90,11 @@ export interface MoneyMovementTransactionContext {
 
     create(input: CreateTransferInput): Promise<TransferRecord>;
   };
+}
+
+export interface TransferExecutionResult {
+  transfer: TransferRecord;
+  isReplay: boolean;
 }
 
 export interface UnitOfWorkPort {

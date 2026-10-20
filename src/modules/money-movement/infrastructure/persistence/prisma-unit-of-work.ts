@@ -55,6 +55,29 @@ export class PrismaUnitOfWork implements UnitOfWorkPort {
           return rows[0] ?? null;
         },
 
+        findByAccountNumber: async (
+          accountNumber: string,
+        ): Promise<AccountSnapshot | null> => {
+          const acc = await tx.bankAccount.findUnique({
+            where: { accountNumber },
+            select: {
+              id: true,
+              userId: true,
+              currentBalance: true,
+              status: true,
+              accountNumber: true,
+            },
+          });
+          if (!acc) return null;
+          return {
+            id: acc.id,
+            userId: acc.userId,
+            currentBalance: acc.currentBalance.toString(),
+            status: acc.status as "ACTIVE" | "CLOSED",
+            accountNumber: acc.accountNumber,
+          };
+        },
+
         updateBalance: async (
           accountId: string,
           newBalance: string,

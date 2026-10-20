@@ -50,10 +50,8 @@ export class TransferMoneyUseCase {
       if (!sourceAccount || sourceAccount.userId !== command.initiatedByUserId) {
         throw new AccountNotFoundError('Source account not found'); 
       }
-      if (sourceAccount.status === 'CLOSED') {
-        throw new AccountClosedError('Source account is closed');
-      }
-
+      // Authorize ownership before returning a previous result. Account state
+      // only gates new transfers, not replay of an already completed transfer.
       const existingTransfer = await ctx.transfers.findBySourceAndIdempotencyKey(
         command.sourceAccountId,
         command.idempotencyKey,
@@ -63,8 +61,12 @@ export class TransferMoneyUseCase {
         return { transfer: existingTransfer, isReplay: true };
       }
 
+      if (sourceAccount.status === 'CLOSED') {
+        throw new AccountClosedError('Source account is closed');
+      }
+
       if (!destAccount || destAccount.status === 'CLOSED') {
-        throw new AccountClosedError('Destination account is closed');
+        throw new AccountNotFoundError('Destination account not found');
       }
 
       const sourceBalance = Money.fromString(sourceAccount.currentBalance);

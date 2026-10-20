@@ -1,7 +1,7 @@
 import { describe, beforeEach, it, expect } from '@jest/globals';
 import { FakeUnitOfWork } from '../helpers/fakes/fake-unit-of-work';
 import { TransferMoneyUseCase } from '../../src/modules/money-movement/application/use-cases/transfer-money.use-case';
-import { InsufficientFundsError, AccountNotFoundError } from '../../src/modules/money-movement/domain/errors';
+import { InsufficientFundsError, AccountNotFoundError, AccountClosedError } from '../../src/modules/money-movement/domain/errors';
 
 describe('TransferMoneyUseCase (Unit Tests)', () => {
   let fakeUnitOfWork: FakeUnitOfWork;
@@ -71,5 +71,65 @@ describe('TransferMoneyUseCase (Unit Tests)', () => {
     expect(result2.isReplay).toBe(true);
     expect(result2.transfer.id).toBe(result1.transfer.id);
     expect(fakeUnitOfWork.accountsDb.get('ACCOUNT_A')?.currentBalance).toBe('30000');
+  });
+
+  const request = {
+    sourceAccountId: 'ACCOUNT_A',
+    destinationAccountNumber: 'ACC_NUM_B',
+    amount: '50000',
+    idempotencyKey: 'closed-account-replay',
+    initiatedByUserId: 'User_1',
+  };
+
+  it('returns 404 for a closed destination without changing balances or history', async () => {
+    fakeUnitOfWork.accountsDb.get('ACCOUNT_B')!.status = 'CLOSED';
+
+    await expect(useCase.execute(request)).rejects.toMatchObject({
+      errorCode: 'ACCOUNT_NOT_FOUND',
+      httpStatus: 404,
+    });
+    expect(fakeUnitOfWork.accountsDb.get('ACCOUNT_A')!.currentBalance).toBe('50000');
+    expect(fakeUnitOfWork.accountsDb.get('ACCOUNT_B')!.currentBalance).toBe('0');
+    expect(fakeUnitOfWork.transfersDb.size).toBe(0);
+    expect(fakeUnitOfWork.transactionsDb.size).toBe(0);
+  });
+
+  it('replays a completed transfer after the source closes without writing again', async () => {
+    const original = await useCase.execute(request);
+    fakeUnitOfWork.accountsDb.get('ACCOUNT_A')!.status = 'CLOSED';
+
+    await expect(useCase.execute(request)).resolves.toEqual({
+      transfer: original.transfer,
+      isReplay: true,
+    });
+    expect(fakeUnitOfWork.accountsDb.get('ACCOUNT_A')!.currentBalance).toBe('0');
+    expect(fakeUnitOfWork.accountsDb.get('ACCOUNT_B')!.currentBalance).toBe('50000');
+    expect(fakeUnitOfWork.transfersDb.size).toBe(1);
+    expect(fakeUnitOfWork.transactionsDb.size).toBe(2);
+  });
+
+  it('still rejects a new key when the source is closed', async () => {
+    await useCase.execute(request);
+    fakeUnitOfWork.accountsDb.get('ACCOUNT_A')!.status = 'CLOSED';
+
+    await expect(useCase.execute({
+      ...request, idempotencyKey: 'new-key',
+    })).rejects.toThrow(AccountClosedError);
+    expect(fakeUnitOfWork.transfersDb.size).toBe(1);
+    expect(fakeUnitOfWork.transactionsDb.size).toBe(2);
+  });
+
+  it('does not expose a previous transfer to someone who does not own the source', async () => {
+    await useCase.execute(request);
+    fakeUnitOfWork.accountsDb.get('ACCOUNT_A')!.status = 'CLOSED';
+
+    await expect(useCase.execute({
+      ...request, initiatedByUserId: 'Wrong_Attacker_User',
+    })).rejects.toMatchObject({
+      errorCode: 'ACCOUNT_NOT_FOUND',
+      httpStatus: 404,
+    });
+    expect(fakeUnitOfWork.transfersDb.size).toBe(1);
+    expect(fakeUnitOfWork.transactionsDb.size).toBe(2);
   });
 });

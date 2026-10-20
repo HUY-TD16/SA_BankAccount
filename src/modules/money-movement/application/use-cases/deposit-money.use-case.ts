@@ -1,10 +1,12 @@
-import { Injectable, Inject } from '@nestjs/common';
 import { Money } from '../../../../common/domain/value-objects/money.value-object';
 import { 
   UnitOfWorkPort, 
-  UNIT_OF_WORK, 
   TransactionEntryRecord 
 } from '../ports/unit-of-work.port';
+import { 
+  AccountNotFoundError, 
+  AccountClosedError 
+} from '../../domain/errors';
 
 export interface DepositMoneyCommand {
   accountId: string;       
@@ -13,24 +15,19 @@ export interface DepositMoneyCommand {
   description?: string;    
 }
 
-@Injectable()
 export class DepositMoneyUseCase {
     constructor(
-        @Inject(UNIT_OF_WORK)
         private readonly unitOfWork: UnitOfWorkPort,
     ) {}
 
     async execute(command: DepositMoneyCommand): Promise<TransactionEntryRecord> {
         return this.unitOfWork.execute(async (ctx) => {
             const account = await ctx.accounts.lockForUpdate(command.accountId);
-            if (!account) {
-                throw new Error('AccountNotFoundError'); 
-            }
-            if (account.userId !== command.userId) {
-                throw new Error('AccountNotFoundError'); 
+            if (!account || account.userId !== command.userId) {
+                throw new AccountNotFoundError(); 
             }
             if (account.status === 'CLOSED') {
-                throw new Error('AccountClosedError');
+                throw new AccountClosedError();
             }
 
             const currentMoney = Money.fromString(account.currentBalance);

@@ -1,10 +1,14 @@
-import { Injectable, Inject } from '@nestjs/common';
 import { Money } from '../../../../common/domain/value-objects/money.value-object';
 import { 
   UnitOfWorkPort, 
-  UNIT_OF_WORK, 
   MoneyMovementTransactionContext 
 } from '../ports/unit-of-work.port';
+import { 
+  AccountNotFoundError, 
+  AccountClosedError, 
+  InsufficientFundsError, 
+  SameSourceDestinationError 
+} from '../../domain/errors';
 
 export interface TransferMoneyCommand {
   sourceAccountId: string;
@@ -15,10 +19,8 @@ export interface TransferMoneyCommand {
   description?: string;
 }
 
-@Injectable()
 export class TransferMoneyUseCase {
     constructor(
-        @Inject(UNIT_OF_WORK)
         private readonly unitOfWork: UnitOfWorkPort,
     ) {}
   
@@ -33,7 +35,7 @@ export class TransferMoneyUseCase {
                 return existingTransfer;
             }
             if (command.sourceAccountId === command.destinationAccountId) {
-                throw new Error('SelfTransferNotAllowed');
+                throw new SameSourceDestinationError();
             }
 
             const [firstId, secondId] = 
@@ -46,23 +48,23 @@ export class TransferMoneyUseCase {
             const destAccount = firstId === command.destinationAccountId ? firstAccount : secondAccount;
 
             if (!sourceAccount || sourceAccount.userId !== command.initiatedByUserId) {
-                throw new Error('SourceAccountNotFoundError'); 
+                throw new AccountNotFoundError('Source account not found'); 
             }
             if (sourceAccount.status === 'CLOSED') {
-                throw new Error('SourceAccountClosedError');
+                throw new AccountClosedError('Source account is closed');
             }
             if (!destAccount) {
-                throw new Error('DestinationAccountNotFoundError'); 
+                throw new AccountNotFoundError('Destination account not found'); 
             }
             if (destAccount.status === 'CLOSED') {
-                throw new Error('DestinationAccountClosedError');
+                throw new AccountClosedError('Destination account is closed');
             }
 
             const sourceBalance = Money.fromString(sourceAccount.currentBalance);
             const destBalance = Money.fromString(destAccount.currentBalance);
             const transferAmount = Money.fromString(command.amount, { allowZero: false });
             if (!sourceBalance.isGreaterThanOrEqual(transferAmount)) {
-                throw new Error('InsufficientFundsError'); 
+                throw new InsufficientFundsError(); 
             }
 
             const newSourceBalance = sourceBalance.subtract(transferAmount).toDecimalString();

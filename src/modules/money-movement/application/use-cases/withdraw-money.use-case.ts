@@ -1,10 +1,13 @@
-import { Injectable, Inject } from '@nestjs/common';
 import { Money } from '../../../../common/domain/value-objects/money.value-object';
 import { 
   UnitOfWorkPort, 
-  UNIT_OF_WORK, 
   TransactionEntryRecord 
 } from '../ports/unit-of-work.port';
+import { 
+  AccountNotFoundError, 
+  AccountClosedError, 
+  InsufficientFundsError 
+} from '../../domain/errors';
 
 export interface WithdrawMoneyCommand {
   accountId: string;       
@@ -13,10 +16,9 @@ export interface WithdrawMoneyCommand {
   description?: string;    
 }
 
-@Injectable()
+
 export class WithdrawMoneyUseCase {
     constructor(
-        @Inject(UNIT_OF_WORK)
         private readonly unitOfWork: UnitOfWorkPort,
     ) {}
 
@@ -25,17 +27,17 @@ export class WithdrawMoneyUseCase {
             const account = await ctx.accounts.lockForUpdate(command.accountId);
 
             if (!account || account.userId !== command.userId) {
-                throw new Error('AccountNotFoundError'); 
+                throw new AccountNotFoundError(); 
             }
             if (account.status === 'CLOSED') {
-                throw new Error('AccountClosedError');
+                throw new AccountClosedError();
             }
 
             const currentMoney = Money.fromString(account.currentBalance);
             const withdrawMoney = Money.fromString(command.amount, { allowZero: false });
 
             if (!currentMoney.isGreaterThanOrEqual(withdrawMoney)) {
-                throw new Error('InsufficientFundsError'); 
+                throw new InsufficientFundsError(); 
             }
 
             const newBalance = currentMoney.subtract(withdrawMoney).toDecimalString();

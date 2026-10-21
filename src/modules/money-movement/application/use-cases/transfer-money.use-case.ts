@@ -1,4 +1,5 @@
 import { Money } from '../../../../common/domain/value-objects/money.value-object';
+import { ValidationError } from '../../../../common/domain/errors/common.errors';
 import { 
   UnitOfWorkPort, 
   MoneyMovementTransactionContext,
@@ -19,6 +20,8 @@ export interface TransferMoneyCommand {
   idempotencyKey: string;   
   description?: string;
 }
+
+const MAX_VND = 999_999_999_999_999_999n;
 
 export class TransferMoneyUseCase {
   constructor(
@@ -78,7 +81,13 @@ export class TransferMoneyUseCase {
       }
 
       const newSourceBalance = sourceBalance.subtract(transferAmount).toDecimalString();
-      const newDestBalance = destBalance.add(transferAmount).toDecimalString();
+      const newDestBalanceMoney = destBalance.add(transferAmount);
+      if (BigInt(newDestBalanceMoney.toDecimalString()) > MAX_VND) {
+        throw new ValidationError([
+          { field: 'amount', reason: 'amount_out_of_range' },
+        ]);
+      }
+      const newDestBalance = newDestBalanceMoney.toDecimalString();
 
       await ctx.accounts.updateBalance(sourceAccount.id, newSourceBalance);
       await ctx.accounts.updateBalance(destAccount.id, newDestBalance);

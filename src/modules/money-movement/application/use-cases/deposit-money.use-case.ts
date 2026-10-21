@@ -1,4 +1,5 @@
 import { Money } from '../../../../common/domain/value-objects/money.value-object';
+import { ValidationError } from '../../../../common/domain/errors/common.errors';
 import { 
   UnitOfWorkPort, 
   TransactionEntryRecord 
@@ -14,6 +15,8 @@ export interface DepositMoneyCommand {
   amount: string;          
   description?: string;    
 }
+
+const MAX_VND = 999_999_999_999_999_999n;
 
 export class DepositMoneyUseCase {
     constructor(
@@ -32,7 +35,14 @@ export class DepositMoneyUseCase {
 
             const currentMoney = Money.fromString(account.currentBalance);
             const depositMoney = Money.fromString(command.amount, { allowZero: false });
-            const newBalance = currentMoney.add(depositMoney).toDecimalString();
+            const newBalanceMoney = currentMoney.add(depositMoney);
+            if (BigInt(newBalanceMoney.toDecimalString()) > MAX_VND) {
+                throw new ValidationError([
+                    { field: 'amount', reason: 'amount_out_of_range' },
+                ]);
+            }
+            const newBalance = newBalanceMoney.toDecimalString();
+            
 
             await ctx.accounts.updateBalance(account.id, newBalance);
             const transactionRecord = await ctx.transactions.create({

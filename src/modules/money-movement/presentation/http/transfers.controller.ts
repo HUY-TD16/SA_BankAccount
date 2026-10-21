@@ -32,7 +32,7 @@ export class TransfersController {
     name: 'Idempotency-Key',
     description: 'Khóa không rỗng do client tạo; được trim và dùng cùng tài khoản nguồn để nhận lại kết quả giao dịch trước đó. Khi thử lại, gửi cùng khóa và payload.',
     required: true,
-    schema: { type: 'string', minLength: 1, example: 'transfer-20261020-001' },
+    schema: { type: 'string', minLength: 16, maxLength: 128, example: 'transfer-20261020-001' },
   })
   @ApiResponse(successResponse(201, 'Transfer successfully created', transferResponseSchema))
   @ApiResponse(successResponse(200, 'Replay of existing transfer with identical Idempotency-Key', transferResponseSchema))
@@ -46,8 +46,8 @@ export class TransfersController {
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
-    if (!idempotencyKey || idempotencyKey.trim().length === 0) {
-      throw new BadRequestException('Idempotency-Key header is required');
+    if (!idempotencyKey || idempotencyKey.trim().length < 16 || idempotencyKey.trim().length > 128) {
+      throw new BadRequestException('Idempotency-Key header must be between 16 and 128 characters');
     }
 
     const result = await this.transferMoneyUseCase.execute({

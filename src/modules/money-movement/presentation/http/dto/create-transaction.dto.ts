@@ -1,4 +1,4 @@
-import { IsEnum, IsNumberString, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEnum, IsNumberString, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum TransactionTypeDto {
@@ -14,11 +14,13 @@ export class CreateTransactionDto {
     @ApiProperty({ type: String, pattern: '^[1-9]\\d*$', example: '100000', description: 'Transaction amount (Must be a positive integer string)' })
     @IsNumberString({}, { message: 'Amount must be a numeric string' })
     @Matches(/^[1-9]\d*$/, { message: 'Amount must be greater than 0 and cannot start with zero' })
+    @MaxLength(18, { message: 'Amount must not exceed 18 digits' })
     amount!: string;
 
     @ApiPropertyOptional({ example: 'Salary deposit', description: 'Transaction description (Optional)' })
     @IsOptional()
     @IsString()
+    @MaxLength(250)
     description?: string;
 }
 

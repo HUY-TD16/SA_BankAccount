@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsUUID, IsNumberString, IsOptional, Matches } from 'class-validator';
+import { IsString, IsNotEmpty, IsUUID, IsNumberString, IsOptional, Matches, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class TransferMoneyDto {
@@ -16,10 +16,12 @@ export class TransferMoneyDto {
   @IsNumberString()
   @Matches(/^[1-9]\d*$/, { message: 'Amount must be greater than 0 and cannot start with zero' })
   @IsNotEmpty()
+  @MaxLength(18, { message: 'Amount must not exceed 18 digits' })
   amount!: string;
 
   @ApiPropertyOptional({ example: 'Lunch payment', description: 'Transfer description (Optional)' })
   @IsOptional()
   @IsString()
+  @MaxLength(250)
   description?: string;
 }

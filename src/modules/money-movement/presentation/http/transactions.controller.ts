@@ -8,7 +8,8 @@ import {
   HttpStatus, 
   Param, 
   Post, 
-  Query 
+  Query,
+  ParseUUIDPipe 
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
 import { Paginated } from '../../../../common/http/interceptors/response-envelope.interceptor';
@@ -42,7 +43,7 @@ export class TransactionController {
   @Post(':accountId/transactions')
   @HttpCode(HttpStatus.CREATED)
   async createTransaction(
-    @Param('accountId') accountId: string,       
+    @Param('accountId', new ParseUUIDPipe({ version: '4' })) accountId: string,  
     @Body() dto: CreateTransactionDto,
     @CurrentUser() user: AccessTokenPayload,
   ) {
@@ -69,7 +70,7 @@ export class TransactionController {
   @ApiResponse(errorResponse(404, 'ACCOUNT_NOT_FOUND: Account not found or not owned by authenticated user'))
   @Get(':accountId/transactions')
   async getTransactions(
-    @Param('accountId') accountId: string,
+    @Param('accountId', new ParseUUIDPipe({ version: '4' })) accountId: string,
     @Query() query: ListTransactionsQueryDto,
     @CurrentUser() user: AccessTokenPayload,
   ) {

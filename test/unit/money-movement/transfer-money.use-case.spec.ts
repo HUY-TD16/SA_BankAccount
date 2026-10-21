@@ -1,7 +1,7 @@
 import { describe, beforeEach, it, expect } from '@jest/globals';
-import { FakeUnitOfWork } from '../helpers/fakes/fake-unit-of-work';
-import { TransferMoneyUseCase } from '../../src/modules/money-movement/application/use-cases/transfer-money.use-case';
-import { InsufficientFundsError, AccountNotFoundError, AccountClosedError } from '../../src/modules/money-movement/domain/errors';
+import { FakeUnitOfWork } from '../../helpers/fakes/fake-unit-of-work';
+import { TransferMoneyUseCase } from '@src/modules/money-movement/application/use-cases/transfer-money.use-case';
+import { InsufficientFundsError, AccountNotFoundError, AccountClosedError } from '@src/modules/money-movement/domain/errors';
 
 describe('TransferMoneyUseCase (Unit Tests)', () => {
   let fakeUnitOfWork: FakeUnitOfWork;

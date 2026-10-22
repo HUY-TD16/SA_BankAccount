@@ -89,6 +89,57 @@ npm run build
 npm test -- --runInBand
 ```
 
+## E2E qua HTTP thật
+
+Yêu cầu Node.js 24, dependency đã cài bằng `npm ci`, PostgreSQL đang chạy.
+Test dùng Node test runner (không dùng Jest và các Nest mock của unit test).
+Nó generate Prisma Client, build source, migrate database test, khởi động
+`dist/main.js` bằng process riêng trên cổng tự chọn rồi gửi request HTTP thật.
+Không cần chạy `npm start` trước. Guard, pipe, filter, interceptor và repository
+đều là implementation thật.
+
+Cách chạy độc lập bằng PostgreSQL Docker riêng (PowerShell):
+
+```powershell
+cd E:\Project\SA_BankAccount\Code\SA_BankAccount
+npm ci
+# Mở Docker Desktop và chờ engine sẵn sàng trước lệnh dưới.
+docker run --name bank-http-e2e -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e_local_test -e POSTGRES_DB=bank_http_test -p 55432:5432 -d postgres:15-alpine
+docker exec bank-http-e2e pg_isready -U e2e -d bank_http_test
+# Chờ lệnh pg_isready báo accepting connections.
+$env:E2E_DATABASE_URL = 'postgresql://e2e:e2e_local_test@localhost:55432/bank_http_test?schema=public'
+npm run test:e2e
+```
+
+Kết quả mong đợi: 6 test PASS, fail 0. Đã xác minh ngày 22/10/2026 trên PostgreSQL
+test trống và chạy lại trên database đã migrate; cả hai lần đều đạt. Mỗi test chứa nhiều request và assertion:
+
+- Full banking flow: register/login, mở account, nạp/rút, chuyển liên user,
+  replay 200 so với lần đầu 201, kiểm tra số dư, lịch sử/phân trang/filter,
+  đóng account 204 body rỗng, replay sau khi nguồn đóng.
+- Guard chặn token thiếu, sai, hết hạn bằng 401 ở GET và POST.
+- DTO body/path/query/header sai trả 400; email trùng 409; sai mật khẩu 401.
+- Ownership chặn đọc/ghi/history/close/transfer của user khác bằng 404.
+- Transfer thiếu tiền trả 409; đích đóng trả 404; từ chối không làm đổi số dư.
+- Mọi response JSON đều kiểm tra success/error envelope, requestId trùng
+  `X-Request-Id`, không trả stack; kết quả identity không lộ password/hash.
+
+Nếu đã có database test, chỉ cần đặt `E2E_DATABASE_URL` tương ứng rồi chạy
+`npm run test:e2e`. Tên database bắt buộc kết thúc bằng `_test`; nếu thiếu biến này,
+runner dùng `DATABASE_URL` nhưng vẫn kiểm tra điều kiện đó trước khi ghi/migrate.
+Test tự dừng process app và dọn các user/account/transaction/transfer riêng của
+lần chạy (kể cả khi assertion thất bại); giữ schema và migration đã áp dụng.
+Không chạy đồng thời với công việc đang reset database test đó.
+
+Chạy lại với container đã tạo: `docker start bank-http-e2e`, đặt lại biến
+`E2E_DATABASE_URL` nếu mở terminal mới, rồi `npm run test:e2e`.
+Sau khi xong có thể xóa riêng container test: `docker rm -f -v bank-http-e2e`.
+
+Lỗi `ECONNREFUSED`: kiểm tra Docker/PostgreSQL và port. Lỗi yêu cầu `_test`:
+đặt lại `E2E_DATABASE_URL` trong cùng terminal. Lỗi `42P04` khi tự tạo database:
+database đã tồn tại, dùng lại database đó. Runner tự migrate nên không cần
+chạy migration thủ công. Unit test vẫn chạy riêng bằng `npm test -- --runInBand`.
+
 ## Kết quả kiểm tra Docker ngày 20/10/2026
 
 Đã build image từ source, không dùng dependency hoặc output build của host,

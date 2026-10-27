@@ -1,264 +1,193 @@
 # SA Bank Account
 
-Backend quản lý tài khoản ngân hàng cơ bản cho môn Kiến trúc phần mềm. Dự án Pha 1 triển khai REST API bằng **TypeScript, NestJS 12, Prisma 7 và PostgreSQL 15**, chạy trên **Node.js 24**.
+**Dịch vụ backend quản lý tài khoản ngân hàng**, xây dựng cho môn Kiến trúc phần mềm. Dự án cung cấp REST API để đăng ký, đăng nhập, mở tài khoản, nạp/rút, chuyển khoản nội bộ, xem lịch sử và đóng tài khoản.
 
-README mô tả kiến trúc, đặc tả và cách chạy theo [đề bài](docs/phase1_document/Requirement.md). Phạm vi nghiệp vụ lấy từ [đặc tả Pha 1 rút gọn](docs/phase1_document/phase1-scope-reduced.md); các tài liệu thiết kế gốc có thể chứa tính năng ngoài phạm vi hiện tại.
+Trọng tâm của Pha 1 là **tính đúng đắn của số dư và giao dịch khi nhiều yêu cầu chạy đồng thời**. Đây là hệ thống mô phỏng: nạp/rút và tiền gửi ban đầu do hệ thống ghi nhận, chưa kết nối ngân hàng hoặc cổng thanh toán bên ngoài.
 
-## 1. Phạm vi và đối chiếu yêu cầu
+> Đọc sâu hơn: [bộ tài liệu dự án](docs/project-guide/README.md). README này trình bày tổng quan; hướng dẫn vận hành và đặc tả chi tiết được tách riêng để dễ tra cứu.
 
-Người dùng đăng ký, đăng nhập, mở tài khoản, xem số dư, nạp/rút tiền, chuyển khoản, xem lịch sử và đóng tài khoản. Đây là mô phỏng nghiệp vụ; nạp/rút không kết nối cổng thanh toán hay ngân hàng bên ngoài.
+## 1. Bài toán và phạm vi
 
-| Yêu cầu đề bài | Cách đáp ứng trong dự án |
+Một khách hàng có thể sở hữu nhiều tài khoản và thực hiện giao dịch trên từng tài khoản. Nếu hai yêu cầu rút tiền cùng đọc một số dư cũ, hệ thống có thể chi vượt số tiền hiện có. Nếu chuyển khoản chỉ trừ nguồn nhưng chưa cộng đích đã gặp lỗi, dữ liệu sẽ bị lệch. Nếu client gửi lại yêu cầu sau timeout, tiền có thể bị chuyển hai lần.
+
+Dự án giải quyết các tình huống này bằng kiểm tra quyền sở hữu, biểu diễn tiền chính xác, database transaction, khóa dòng tài khoản và khóa chống lặp cho chuyển khoản.
+
+| Nhóm chức năng | Hành vi đã triển khai |
 | --- | --- |
-| REST API, JSON; có POST, GET, DELETE | API `/api/v1`, danh sách endpoint ở mục 4 |
-| Tài liệu OpenAPI/Swagger | Swagger UI `/api/docs`, OpenAPI JSON `/api/docs.json` khi không chạy production |
-| Phân tầng API → nghiệp vụ → truy cập dữ liệu | Controller/DTO → use case/domain → port → Prisma repository/unit of work |
-| Nghiệp vụ không import framework web hoặc thư viện DB | Use case dùng TypeScript và các port; cấu hình DI tại module NestJS |
-| Đăng nhập; ít nhất một GET và POST có xác thực tập trung | JWT và `AccessTokenGuard` toàn cục; GET/POST `/accounts` đều cần token |
-| Đóng gói Docker | Dockerfile nhiều stage, Compose gồm PostgreSQL, migration và ứng dụng |
-| GitHub công khai, commit cẩn thận, README mô tả kiến trúc/đặc tả | [Repository](https://github.com/HUY-TD16/SA_BankAccount); nhóm cần bảo đảm quyền truy cập công khai khi nộp bài |
-| Kiểm thử tải trên Kaggle CPU | **Chưa hoàn thành:** `test/performance/index.ts` hiện là placeholder, chưa có kết quả baseline |
+| Danh tính | Đăng ký bằng email/mật khẩu; đăng nhập nhận JWT |
+| Tài khoản | Mở tài khoản PAYMENT/SAVINGS; xem danh sách, chi tiết, số dư; đóng logic |
+| Nạp/rút | Ghi nhận CREDIT/DEBIT và số dư sau giao dịch |
+| Chuyển khoản | Chuyển VND giữa hai tài khoản nội bộ, kể cả khác chủ sở hữu |
+| Lịch sử | Phân trang; lọc theo loại giao dịch và khoảng thời gian |
+| Hỗ trợ tích hợp | Swagger/OpenAPI, response thống nhất, request ID, Docker |
 
-Chưa thuộc Pha 1: MFA, refresh token, quên mật khẩu, nhân viên ngân hàng, audit log nghiệp vụ, rate limiting, caching và xử lý bất đồng bộ. Các thư mục placeholder không đại diện cho tính năng đã triển khai.
+Luồng sử dụng: **đăng ký → đăng nhập → mở tài khoản → nạp/rút/chuyển tiền → xem lịch sử → đưa số dư về 0 → đóng tài khoản**.
 
-## 2. Kiến trúc
+Chưa triển khai: tính lãi SAVINGS, phí giao dịch, đa tiền tệ, chuyển liên ngân hàng, MFA, refresh token, quên mật khẩu, nghiệp vụ nhân viên và xử lý bất đồng bộ. Các thư mục placeholder không được xem là tính năng hoàn thành.
 
-Ứng dụng là một **modular monolith**: ba module nghiệp vụ chạy trong một process và dùng chung PostgreSQL.
+## 2. Công nghệ
+
+| Thành phần | Công nghệ trong repository | Vai trò |
+| --- | --- | --- |
+| Runtime, ngôn ngữ | Node.js 24 trong Docker; TypeScript | Chạy backend và mô hình hóa nghiệp vụ |
+| Web framework | NestJS 12, Express adapter | Controller, module, dependency injection |
+| Truy cập dữ liệu | Prisma 7, PostgreSQL driver adapter | Repository, transaction và migration |
+| Database | PostgreSQL 15 trong Compose | Lưu dữ liệu, khóa dòng và ràng buộc toàn vẹn |
+| Xác thực | JWT, bcrypt | Access token và băm mật khẩu |
+| Kiểm tra đầu vào | class-validator, class-transformer | Validate body, path và query |
+| Tài liệu API | @nestjs/swagger | Swagger UI và OpenAPI JSON |
+| Đóng gói, kiểm thử | Docker Compose; Jest; Node test runner | Môi trường chạy, unit/integration và HTTP E2E |
+
+Phiên bản dependency được khai báo trong [package.json](package.json), khóa cụ thể trong `package-lock.json`. Kiểm thử tải chưa có kịch bản chạy được; k6 chưa phải thành phần đã triển khai.
+
+## 3. Kiến trúc tổng quan
+
+Ứng dụng là **modular monolith**: các module nghiệp vụ chạy trong một ứng dụng NestJS, dùng chung PostgreSQL. Bên trong mỗi module, mã được chia theo lớp và dùng port/adapter để tách nghiệp vụ khỏi cách truy cập dữ liệu.
 
 ```mermaid
 flowchart LR
-    Client[HTTP client] --> API[Controller / DTO]
-    API --> UC[Application / Use case]
-    UC --> Domain[Domain / Entity / Money]
+    Client[Client / Swagger] --> HTTP[Controller và DTO]
+    HTTP --> UC[Application: use case]
+    UC --> Domain[Domain: entity, Money, lỗi]
     UC --> Port[Repository / Unit of Work port]
-    Infra[Infrastructure / Prisma adapter] -. implements .-> Port
-    Infra --> DB[(PostgreSQL)]
-    Module[NestJS module / DI] -. wires .-> UC
-    Module -. wires .-> Infra
+    Adapter[Infrastructure: Prisma, JWT, bcrypt] -. triển khai .-> Port
+    Adapter --> DB[(PostgreSQL)]
+    DI[NestJS module] -. kết nối phụ thuộc .-> UC
+    DI -. kết nối phụ thuộc .-> Adapter
 ```
 
-- **Presentation:** nhận request, validate DTO, lấy danh tính từ JWT và chuyển kết quả sang HTTP.
-- **Application/Domain:** thực hiện nghiệp vụ, ownership, trạng thái tài khoản, tính tiền và quyết định replay; không truy vấn Prisma trực tiếp.
-- **Infrastructure:** triển khai repository và unit of work, truy vấn PostgreSQL qua Prisma; triển khai bcrypt và JWT qua các port.
-- **Composition:** các file `*.module.ts` nối implementation với use case qua dependency injection.
-
-| Module | Trách nhiệm |
+| Module/lớp | Trách nhiệm |
 | --- | --- |
-| `identity` | Đăng ký, chuẩn hóa email, băm mật khẩu và đăng nhập |
-| `accounts` | Mở, liệt kê, xem và đóng tài khoản |
-| `money-movement` | Nạp/rút, chuyển khoản, lịch sử giao dịch |
-| `common` | JWT guard, validation, error filter, response envelope, request ID và logging |
+| `identity` | Tạo người dùng, kiểm tra mật khẩu, phát JWT |
+| `accounts` | Vòng đời tài khoản và quyền sở hữu |
+| `money-movement` | Nạp/rút, chuyển khoản, truy vấn lịch sử |
+| `presentation` | Nhận HTTP, validate DTO, lấy user từ token, trả response |
+| `application` / `domain` | Điều phối nghiệp vụ, tính tiền, kiểm tra điều kiện và khai báo port |
+| `infrastructure` | Triển khai port bằng Prisma, PostgreSQL, JWT và bcrypt |
+| `common` | Guard, validation, xử lý lỗi, envelope, request ID và logging |
 
-`AccessTokenGuard` đăng ký qua `APP_GUARD`, bảo vệ mặc định các controller; đăng ký/đăng nhập dùng `@Public()`. Kiểm tra quyền sở hữu nằm trong nghiệp vụ. `GlobalExceptionFilter` chuyển lỗi sang HTTP; interceptor đóng gói response và middleware gắn request ID.
+Use case phụ thuộc vào interface thay vì gọi Prisma trực tiếp. Các file `*.module.ts` nối use case với implementation qua dependency injection. Nhờ vậy có thể kiểm thử nghiệp vụ bằng fake repository/unit of work, trong khi các test tích hợp kiểm chứng hành vi database thật.
+
+Guard JWT được đăng ký toàn cục; chỉ đăng ký/đăng nhập được đánh dấu public. Quyền sở hữu được kiểm tra trong nghiệp vụ. Với thao tác tiền, unit of work giữ các cập nhật và bản ghi lịch sử trong cùng một transaction.
 
 ```text
 src/
-  main.ts                         # Bootstrap HTTP, prefix, Swagger
-  app.module.ts                   # Ghép module, guard toàn cục
-  common/                         # HTTP, security, config, domain dùng chung
+  main.ts, app.module.ts       # Khởi động và ghép module
+  common/                     # HTTP, bảo mật, cấu hình, Money
   modules/
     identity/
     accounts/
-    money-movement/
-      presentation/http/          # Controller, DTO, schema Swagger
-      application/ports/          # Hợp đồng với adapter
-      application/use-cases/      # Điều phối nghiệp vụ
-      domain/                     # Khái niệm và lỗi nghiệp vụ
-      infrastructure/             # Adapter và truy cập dữ liệu
-  infrastructure/prisma/          # Kết nối DB dùng chung
-prisma/                           # Schema và migration SQL
- test/                            # Unit, integration, HTTP E2E
- docs/                            # Đề bài, đặc tả, hướng dẫn bổ sung
+    money-movement/           # Mỗi module có các lớp nêu trên
+  infrastructure/prisma/      # Kết nối database
+prisma/                       # Schema và migration SQL
+test/                         # Unit, integration, HTTP E2E
+docs/project-guide/           # Tài liệu chi tiết theo chủ đề
 ```
 
-Ba module nghiệp vụ áp dụng cùng cách phân tầng; cây trên mở rộng `money-movement` làm ví dụ.
+Xem [kiến trúc và luồng chuyển khoản](docs/project-guide/01-architecture.md).
 
-## 3. Dữ liệu và quy tắc nghiệp vụ
+## 4. Dữ liệu và quy tắc cốt lõi
 
-```mermaid
-erDiagram
-    USERS ||--o{ BANK_ACCOUNTS : owns
-    USERS ||--o{ TRANSFERS : initiates
-    BANK_ACCOUNTS ||--o{ FINANCIAL_TRANSACTIONS : records
-    BANK_ACCOUNTS ||--o{ TRANSFERS : source
-    BANK_ACCOUNTS ||--o{ TRANSFERS : destination
-    TRANSFERS o|--o{ FINANCIAL_TRANSACTIONS : links
-    USERS {
-        string user_id PK
-        string email UK
-        string password_hash
-    }
-    BANK_ACCOUNTS {
-        string id PK
-        string user_id FK
-        string account_number UK
-        decimal current_balance
-        string status
-        datetime closed_at
-    }
-    FINANCIAL_TRANSACTIONS {
-        string id PK
-        string account_id FK
-        string transfer_id FK
-        string transaction_type
-        string reference_type
-        decimal amount
-        decimal balance_after
-    }
-    TRANSFERS {
-        string id PK
-        string source_account_id FK
-        string destination_account_id FK
-        string initiated_by_user_id FK
-        string idempotency_key
-        decimal amount
-    }
-```
+| Thực thể | Ý nghĩa | Quan hệ chính |
+| --- | --- | --- |
+| User | Khách hàng và thông tin đăng nhập | Một user có nhiều tài khoản |
+| BankAccount | Số tài khoản, loại, số dư, trạng thái | Thuộc một user; có nhiều giao dịch |
+| FinancialTransaction | Một lần ghi tăng/giảm số dư của một tài khoản | Có thể thuộc một Transfer |
+| Transfer | Một lệnh chuyển tiền nội bộ | Liên kết nguồn, đích, người thực hiện và hai giao dịch đối ứng |
 
-Schema đầy đủ: [prisma/schema.prisma](prisma/schema.prisma). ERD thể hiện quan hệ lưu trữ; nghiệp vụ chuyển khoản tạo đúng hai bút toán đối ứng.
+**Tiền:** chỉ dùng VND nguyên, lưu `DECIMAL(18,0)`, tính bằng `bigint` trong `Money`, gửi qua JSON dưới dạng chuỗi như `"100000"`. Amount giao dịch phải dương; tiền gửi ban đầu có thể bằng `0`. Giá trị tiền lưu trữ tối đa là `999999999999999999`.
 
-- Tiền chỉ dùng **VND**, lưu `DECIMAL(18,0)` và truyền qua JSON dưới dạng chuỗi, ví dụ `"100000"`. Số dư không âm; amount giao dịch phải dương; tiền gửi ban đầu được bằng `0`.
-- Tài khoản có loại `PAYMENT` hoặc `SAVINGS`, trạng thái `ACTIVE` hoặc `CLOSED`. Chưa tính lãi tiết kiệm.
-- Chỉ chủ tài khoản được xem chi tiết, lịch sử, nạp/rút hoặc đóng; tài khoản không thuộc người gọi trả `404`.
-- Đóng tài khoản chỉ khi số dư bằng `0`. DELETE là đóng logic, giữ lịch sử; gọi lại trên tài khoản đã đóng trả `204`.
-- Chuyển khoản cho phép giữa người dùng khác nhau, nhưng người gọi phải sở hữu nguồn; nguồn và đích phải khác nhau. Đích không tồn tại hoặc đã đóng trả `404`; chuyển mới từ nguồn đã đóng trả `409`.
-- Cập nhật tiền và ghi lịch sử nằm trong cùng DB transaction. Nạp/rút khóa dòng tài khoản; chuyển khoản khóa hai tài khoản theo thứ tự ID để giảm nguy cơ deadlock. Lỗi trong transaction làm rollback.
-- Transfer dùng khóa duy nhất `(source_account_id, idempotency_key)`: lần đầu trả `201`, replay trả kết quả cũ với `200`, kể cả sau khi nguồn đã đóng. Client phải gửi lại cùng key và payload; phiên bản hiện tại chưa so sánh hash payload.
-- Email được chuẩn hóa lowercase/trim và unique; mật khẩu lưu dưới dạng bcrypt hash.
+**Quyền và trạng thái:** chỉ chủ tài khoản được xem, nạp/rút, xem lịch sử hoặc đóng tài khoản đó. Không tồn tại hoặc không thuộc người gọi đều trả `404`. Tài khoản chỉ được đóng khi số dư bằng `0`; đóng logic thành `CLOSED`, giữ lịch sử. Gọi đóng lại trả `204`. Tài khoản SAVINGS hiện có cùng quy tắc giao dịch cơ bản với PAYMENT, chưa có lãi suất.
 
-Migration bổ sung **9 CHECK constraint**: email chuẩn hóa; số dư tài khoản không âm; currency VND; trạng thái đóng khớp `closed_at`; amount và số dư sau giao dịch hợp lệ; cặp transaction type/reference hợp lệ; amount chuyển khoản dương; nguồn khác đích. Xem [hướng dẫn CHECK constraint](docs/database-check-constraints.md).
+**Nhất quán:** cập nhật số dư và ghi lịch sử cùng commit hoặc rollback. Nạp/rút dùng `SELECT ... FOR UPDATE`; chuyển khoản khóa hai tài khoản theo thứ tự ID. Chuyển 100.000 VND từ A sang B tạo một DEBIT ở A và một CREDIT ở B, tổng số dư hai tài khoản không đổi. Quy tắc bảo toàn này áp dụng cho chuyển nội bộ; nạp/rút làm thay đổi tổng tiền mô phỏng trong hệ thống.
 
-## 4. Đặc tả HTTP API
+**Chống lặp:** transfer dùng cặp duy nhất `(sourceAccountId, idempotencyKey)`. Lần đầu trả `201`, gửi lại cùng key và payload trả kết quả cũ với `200`. Hiện chưa so sánh payload khi key được dùng lại; client phải giữ nguyên thông tin chuyển tiền khi retry. Nạp/rút chưa có cơ chế này.
 
-Base URL mặc định: `http://localhost:3000/api/v1`. Request có body dùng `Content-Type: application/json`. Endpoint bảo vệ yêu cầu `Authorization: Bearer <accessToken>`.
+**Bảo vệ dữ liệu:** mật khẩu được băm bằng bcrypt; response không chứa password hash. API không có chức năng sửa/xóa giao dịch đã ghi nhận. CHECK constraint bổ sung hàng rào tại DB, nhưng không biến database thành sổ cái bất biến trước mọi thao tác SQL trực tiếp.
 
-| Method | Path (sau `/api/v1`) | JWT | Đầu vào chính | Thành công |
-| --- | --- | --- | --- | --- |
-| POST | `/auth/register` | Không | `fullName`, `email`, `password`, `confirmPassword` | 201 |
-| POST | `/auth/login` | Không | `email`, `password` | 200 |
-| POST | `/accounts` | Có | `accountName`, `accountType`, `initialDeposit` | 201 |
-| GET | `/accounts` | Có | Query `page`, `limit`, `status` | 200 |
-| GET | `/accounts/{accountId}` | Có | UUID tài khoản | 200 |
-| DELETE | `/accounts/{accountId}` | Có | UUID tài khoản, số dư phải bằng 0 | 204, body rỗng |
-| POST | `/accounts/{accountId}/transactions` | Có | `type`: CREDIT/DEBIT, `amount`, `description?` | 201 |
-| GET | `/accounts/{accountId}/transactions` | Có | Query `page`, `limit`, `type`, `from`, `to` | 200 |
-| POST | `/transfers` | Có | `sourceAccountId`, `destinationAccountNumber`, `amount`, `description?` | 201 mới / 200 replay |
+Xem [database và ERD](docs/project-guide/02-database.md), [nghiệp vụ và tình huống biên](docs/project-guide/04-business-rules.md).
 
-Transfer bắt buộc thêm header `Idempotency-Key` dài 16–128 ký tự sau trim. `CREDIT` là nạp tiền, `DEBIT` là rút tiền. Schema, giới hạn DTO và ví dụ chi tiết nằm trong Swagger.
+## 5. Endpoint và quy ước API
 
-Response thành công:
+Base URL mặc định: `http://localhost:3000/api/v1`. Body dùng JSON; các endpoint bảo vệ yêu cầu `Authorization: Bearer <accessToken>`.
+
+| Method | Path sau `/api/v1` | JWT | Mục đích / kết quả |
+| --- | --- | --- | --- |
+| POST | `/auth/register` | Không | Tạo user — 201 |
+| POST | `/auth/login` | Không | Nhận access token và user — 200 |
+| POST | `/accounts` | Có | Mở tài khoản — 201 |
+| GET | `/accounts` | Có | Danh sách tài khoản của mình — 200 |
+| GET | `/accounts/{accountId}` | Có | Chi tiết tài khoản — 200 |
+| DELETE | `/accounts/{accountId}` | Có | Đóng tài khoản — 204, body rỗng |
+| POST | `/accounts/{accountId}/transactions` | Có | Nạp CREDIT hoặc rút DEBIT — 201 |
+| GET | `/accounts/{accountId}/transactions` | Có | Lịch sử có phân trang — 200 |
+| POST | `/transfers` | Có | Chuyển tiền — 201 mới / 200 replay |
+
+Ví dụ body mở tài khoản:
 
 ```json
-{ "success": true, "data": {}, "meta": { "requestId": "..." } }
+{ "accountName": "Chi tiêu", "accountType": "PAYMENT", "initialDeposit": "500000" }
 ```
 
-Danh sách có thêm `pagination` cùng cấp với `data`: `page`, `limit`, `total`, `totalPages`. Response lỗi:
+Ví dụ body chuyển khoản; thay UUID nguồn và số tài khoản đích bằng dữ liệu đã tạo. Gửi thêm header `Idempotency-Key: transfer-demo-20261027-001` (16–128 ký tự sau trim):
+
+```json
+{
+  "sourceAccountId": "81ed4895-3bc6-46c9-b7b2-c0e86b978a10",
+  "destinationAccountNumber": "100000012345",
+  "amount": "100000",
+  "description": "Thanh toán nội bộ"
+}
+```
+
+Đích chuyển khoản được nhập bằng **số tài khoản** (`destinationAccountNumber`), còn nguồn dùng **ID nội bộ** (`sourceAccountId`). Client không tự gửi `userId`, `currentBalance` hoặc `accountNumber` khi mở tài khoản; field ngoài DTO bị từ chối.
+
+Response thành công có dạng `{ "success": true, "data": ..., "meta": { "requestId": "..." } }`. Danh sách có thêm `pagination` cùng cấp với `data`, gồm `page`, `limit`, `total`, `totalPages`. Mặc định trang 1, mỗi trang 20 bản ghi; tối đa 100.
+
+Ví dụ lỗi:
 
 ```json
 {
   "success": false,
-  "error": { "code": "INSUFFICIENT_FUNDS", "message": "Số dư không đủ." },
-  "meta": { "requestId": "..." }
+  "error": { "code": "INSUFFICIENT_FUNDS", "message": "Insufficient funds" },
+  "meta": { "requestId": "demo-request-id" }
 }
 ```
 
-Lỗi có thể thêm `error.details`. `meta.requestId` khớp header `X-Request-Id`; lỗi nội bộ không trả stack trace. Response `204` không có envelope.
+Lỗi có thể kèm `error.details`. Header `X-Request-Id` giúp đối chiếu response với log. Mã HTTP chính: `400` dữ liệu sai, `401` xác thực thất bại, `404` không tìm thấy/không sở hữu, `409` xung đột nghiệp vụ, `500` lỗi nội bộ với thông báo an toàn.
 
-| HTTP status | Ý nghĩa |
-| --- | --- |
-| 400 | Body/path/query/header không hợp lệ, chuyển cùng tài khoản |
-| 401 | Sai thông tin đăng nhập; token thiếu, sai hoặc hết hạn |
-| 404 | Không tìm thấy/không sở hữu tài khoản; đích chuyển khoản đã đóng |
-| 409 | Email trùng, thiếu tiền, nguồn không hoạt động, đóng tài khoản còn tiền |
-| 500 | Lỗi nội bộ ngoài dự kiến |
+Hợp đồng từng endpoint, bộ lọc và ví dụ response: [API chi tiết](docs/project-guide/03-api.md). Khi chạy ở môi trường không phải production, mở [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json).
 
-## 5. Chạy bằng Docker từ máy sạch
+## 6. Khởi chạy nhanh
 
-Cần Git và Docker Engine/Desktop đang chạy, có Compose v2. Không cần Node.js hay PostgreSQL trên host. Các lệnh bên dưới dùng **PowerShell**, chạy tại thư mục repository.
+Cần Git và Docker có Compose v2. Các lệnh dưới đây dùng PowerShell, chạy tại thư mục gốc repository:
 
 ```powershell
-git clone https://github.com/HUY-TD16/SA_BankAccount.git
-cd SA_BankAccount
-Copy-Item .env.example .env
+# Chỉ sao chép khi chưa có .env:
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Nếu đã có repository, bắt đầu từ bước sao chép `.env.example`. Sửa `.env` trước khi chạy:
-
-| Biến | Mục đích |
-| --- | --- |
-| `DB_USER`, `DB_PASSWORD`, `DB_NAME` | User, mật khẩu và DB được PostgreSQL tạo ở lần chạy đầu |
-| `DB_PORT` | Cổng PostgreSQL trên host, mặc định 5432 |
-| `DATABASE_URL` | URL cho app/Prisma chạy trên host: `localhost:<DB_PORT>` |
-| `DOCKER_DATABASE_URL` | URL trong Compose: `postgres:5432` |
-| `APP_PORT` | Cổng HTTP trên host, mặc định 3000 |
-| `NODE_ENV` | `production` mặc định trong Compose; dùng `development` để mở Swagger |
-| `JWT_ACCESS_SECRET` | Thay placeholder bằng secret riêng, ngẫu nhiên đủ mạnh |
-| `JWT_ACCESS_TTL` | Hạn access token, mặc định `60m` |
-| `BCRYPT_ROUNDS` | Chi phí băm mật khẩu, mặc định 12 |
-
-Hai URL phải dùng đúng thông tin DB đã chọn. Khi mật khẩu chứa ký tự đặc biệt, URL-encode phần mật khẩu trong URL; `DB_PASSWORD` giữ giá trị gốc. Không commit `.env` chứa secret.
+Sửa `.env`: điền `DB_USER`, `DB_PASSWORD`, `DB_NAME` và secret riêng cho `JWT_ACCESS_SECRET`; bảo đảm `DOCKER_DATABASE_URL` trỏ tới `postgres:5432` với đúng thông tin DB. Đặt `NODE_ENV=development` nếu muốn xem Swagger. Không commit secret.
 
 ```powershell
 docker compose up --build -d --wait --wait-timeout 180
 docker compose ps -a
 ```
 
-Kết quả mong đợi: `postgres` healthy → `migrate` exit 0 → `app` healthy. Migration tự chạy bằng `prisma migrate deploy` trước khi app khởi động. API ở `http://localhost:3000/api/v1` nếu giữ cổng mặc định.
+Compose khởi động PostgreSQL, chạy migration rồi mới chạy app. Trạng thái mong đợi: `postgres` healthy, `migrate` exit 0, `app` healthy. API mặc định ở cổng 3000; `APP_PORT` đổi cổng trên host. Swagger hiện phụ thuộc `NODE_ENV`; biến `ENABLE_SWAGGER` trong file mẫu chưa được sử dụng.
 
-Để xem tài liệu, đặt `NODE_ENV=development` trong `.env`, chạy `docker compose up -d`, rồi mở [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json). Nút **Authorize** nhận access token sau đăng nhập, không nhập thêm chữ `Bearer`. Code hiện bật Swagger dựa trên `NODE_ENV`; biến `ENABLE_SWAGGER` trong file mẫu chưa được sử dụng.
+Để demo: đăng ký và đăng nhập trong Swagger, lấy `data.accessToken`, bấm **Authorize**, tạo hai tài khoản rồi thử nạp/rút/chuyển tiền và đọc lịch sử. Chỉ đóng khi số dư đã về `0`.
 
 ```powershell
 docker compose logs --tail 100 app migrate
 docker compose down
-# Sau khi cập nhật source/migration:
-docker compose up --build -d --wait --wait-timeout 180
 ```
 
-`down` giữ dữ liệu trong named volume; `down --volumes` xóa dữ liệu. Đổi thông tin DB trong `.env` không tự đổi user/database trong volume đã khởi tạo. Để kiểm tra máy sạch, dùng project riêng (`docker compose -p sa-bankaccount-clean ...`) và cổng riêng; giữ cùng tên project trong mọi lệnh của lần kiểm tra.
+`down` giữ dữ liệu trong volume. Hướng dẫn chạy Node.js trên host, cấu hình URL database và script demo PowerShell: [chạy dự án](docs/project-guide/05-running.md).
 
-Image dùng build nhiều stage, chạy bằng user `node`, không chép `.env` vào image. Healthcheck app kiểm tra route bảo vệ trả `401` sau bootstrap; đây là liveness check, không phải kiểm tra kết nối DB liên tục.
+## 7. Kiểm thử, giới hạn và tài liệu
 
-## 6. Chạy phát triển trên host
-
-Cần Node.js 24 và PostgreSQL. Sau khi tạo `.env`, có thể chỉ chạy DB bằng Compose:
-
-```powershell
-npm ci
-docker compose up -d --wait postgres
-# Thay user/password/DB bằng giá trị thật trong .env:
-$env:DATABASE_URL = 'postgresql://your_db_user:your_password_here@localhost:5432/your_database_name?schema=public'
-$env:NODE_ENV = 'development'
-npx prisma generate
-npx prisma migrate deploy
-npm run start:dev
-```
-
-Prisma CLI dùng `dotenv`, không tự nội suy `${DB_USER}` trong URL mẫu như Compose. Vì vậy hãy đặt `DATABASE_URL` hoàn chỉnh trong terminal như trên hoặc sửa thành URL hoàn chỉnh trong `.env`. `JWT_ACCESS_SECRET` vẫn lấy từ `.env`. App trên host dùng `PORT` (mặc định 3000); `APP_PORT` chỉ dành cho ánh xạ cổng Compose.
-
-## 7. Thử API nhanh
-
-Sau khi app chạy, thực hiện đăng ký → đăng nhập → mở tài khoản → xem danh sách:
-
-```powershell
-$baseUrl = 'http://localhost:3000/api/v1'
-$email = "demo-$([guid]::NewGuid().ToString('N'))@example.test"
-$register = @{ fullName='Demo User'; email=$email; password='DemoTest123!'; confirmPassword='DemoTest123!' } | ConvertTo-Json
-Invoke-RestMethod "$baseUrl/auth/register" -Method Post -ContentType 'application/json' -Body $register
-$login = @{ email=$email; password='DemoTest123!' } | ConvertTo-Json
-$session = Invoke-RestMethod "$baseUrl/auth/login" -Method Post -ContentType 'application/json' -Body $login
-$headers = @{ Authorization="Bearer $($session.data.accessToken)" }
-$body = @{ accountName='Demo account'; accountType='PAYMENT'; initialDeposit='0' } | ConvertTo-Json
-$account = Invoke-RestMethod "$baseUrl/accounts" -Method Post -Headers $headers -ContentType 'application/json' -Body $body
-Invoke-RestMethod "$baseUrl/accounts" -Headers $headers
-# Đóng tài khoản vừa tạo, số dư đang bằng 0:
-Invoke-RestMethod "$baseUrl/accounts/$($account.data.id)" -Method Delete -Headers $headers
-```
-
-Các lệnh tạo dữ liệu demo thật trong database được cấu hình. Đóng tài khoản giữ lại bản ghi và trả `204` không có body.
-
-## 8. Kiểm thử
-
-### Unit và hợp đồng Swagger
+Repository có unit test bằng Jest, integration test với PostgreSQL, test hợp đồng Swagger và 6 ca HTTP E2E bằng Node test runner. Test mặc định chỉ chạy unit; integration/E2E cần database riêng có tên kết thúc bằng `_test`.
 
 ```powershell
 npm ci
@@ -267,61 +196,15 @@ npm test -- --runInBand
 npm run test:swagger
 ```
 
-Unit test kiểm tra nghiệp vụ và các thành phần riêng lẻ; test Swagger kiểm tra tài liệu sinh từ source. Chúng không thay thế E2E qua HTTP thật.
+Xem [hướng dẫn kiểm thử](docs/project-guide/06-testing.md) để chuẩn bị DB và chạy integration/E2E. Kiểm thử tải trên Kaggle CPU theo đề bài chưa hoàn thành; chưa có số liệu throughput/latency để kết luận hiệu năng. Healthcheck Docker hiện kiểm tra ứng dụng trả `401` ở route bảo vệ, chưa kiểm tra liên tục khả năng kết nối DB.
 
-### E2E qua HTTP thật
+| Muốn tìm hiểu | Tài liệu |
+| --- | --- |
+| Ranh giới module, dependency, luồng xử lý | [Kiến trúc](docs/project-guide/01-architecture.md) |
+| ERD, bảng, khóa, constraint, tính nhất quán | [Database](docs/project-guide/02-database.md) |
+| Request, response, validation, lỗi | [API](docs/project-guide/03-api.md) |
+| Use case, quy tắc tiền, retry, đóng tài khoản | [Nghiệp vụ](docs/project-guide/04-business-rules.md) |
+| Docker, chạy local, demo và kiểm thử | [Chạy dự án](docs/project-guide/05-running.md) · [Kiểm thử](docs/project-guide/06-testing.md) |
+| Nhận xét tài liệu giới thiệu ban đầu | [Đánh giá introduce.md](docs/project-guide/07-introduce-review.md) |
 
-Tạo PostgreSQL test riêng; cần Docker đang chạy và Node.js 24 trên host:
-
-```powershell
-docker run --name bank-http-e2e -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e_local_test -e POSTGRES_DB=bank_http_test -p 55432:5432 -d postgres:15-alpine
-docker exec bank-http-e2e pg_isready -U e2e -d bank_http_test
-# Chờ pg_isready báo accepting connections trước khi chạy test.
-$env:E2E_DATABASE_URL = 'postgresql://e2e:e2e_local_test@localhost:55432/bank_http_test?schema=public'
-npm run test:e2e
-```
-
-Runner tự generate Prisma Client, build, migrate DB test, khởi động `dist/main.js` trên cổng tự chọn và gửi HTTP thật. Không cần khởi động app trước. Bộ test hiện có 6 test case, bao phủ luồng ngân hàng, guard, DTO, ownership, status code, response envelope và replay transfer.
-
-**Database phải tồn tại trước**, tên kết thúc bằng `_test`. Nếu thiếu `E2E_DATABASE_URL`, runner dùng `DATABASE_URL` và vẫn kiểm tra hậu tố. Dùng DB riêng cho test; không chạy đồng thời với tác vụ reset DB đó.
-
-Mỗi lần chạy suite dùng `runId` riêng. Hook kết thúc dừng app và xóa dữ liệu của lần chạy, giữ schema/migration; các case trong suite có dùng chung fixture. Nếu process bị kill hoặc máy tắt đột ngột, cleanup có thể không chạy.
-
-Chạy lại: `docker start bank-http-e2e`, đặt lại biến môi trường nếu mở terminal mới, rồi `npm run test:e2e`. Khi không cần DB test nữa, xóa riêng container bằng `docker rm -f -v bank-http-e2e`.
-
-### Integration với PostgreSQL
-
-Dùng DB test ở trên, đặt `DATABASE_URL` trong cùng terminal:
-
-```powershell
-$env:DATABASE_URL = 'postgresql://e2e:e2e_local_test@localhost:55432/bank_http_test?schema=public'
-npx prisma migrate deploy
-npx jest --config jest.integration.config.js --runInBand
-# Hoặc chỉ kiểm tra CHECK constraint:
-npx jest --config jest.integration.config.js --runInBand test/integration/database/check-constraints.spec.ts
-```
-
-Integration kiểm tra repository, transaction và database; `banking-flow.spec.ts` gọi trực tiếp use case. Bộ CHECK constraint tạo schema riêng, áp dụng migration và thử SQL vi phạm. HTTP E2E nằm ở `test/e2e/banking-http.e2e.cjs` và chạy bằng Node test runner, không dùng Jest.
-
-Lỗi thường gặp:
-
-- `ECONNREFUSED`: kiểm tra Docker/PostgreSQL và cổng trong URL.
-- `Integration tests require a dedicated *_test DATABASE_URL`: đặt URL tới DB test trong đúng terminal đang chạy Jest.
-- E2E báo DB không tồn tại: tạo DB trước; migration không thay thế bước chuẩn bị DB của runner.
-- Swagger không mở: kiểm tra `NODE_ENV`; production hiện không expose Swagger.
-
-## 9. Kiểm thử tải và hướng phát triển Pha 2
-
-Đề bài yêu cầu kiểm thử tải trên **Kaggle CPU**. Repository hiện chưa có kịch bản chạy được hoặc số liệu; không xem kết quả unit/E2E là bằng chứng hiệu năng.
-
-Để hoàn tất yêu cầu này, nhóm cần bổ sung workload tối thiểu gồm login, list account và debit đồng thời; lưu cấu hình CPU/RAM, phiên bản source, dữ liệu đầu vào, số client, thời lượng, throughput, p50/p95/p99 và error rate. Khi so sánh Pha 2 phải giữ cùng cấu hình phần cứng, workload và cách đo, đồng thời kiểm tra invariant số dư sau tải.
-
-Các đề xuất Pha 2 như rate limiting, idempotency có so payload, caching hoặc quan sát metrics/tracing cần được chọn dựa trên kết quả baseline và đánh giá trước/sau, theo yêu cầu đề bài.
-
-## 10. Tài liệu tham khảo trong repository
-
-- [Đề bài](docs/phase1_document/Requirement.md)
-- [Phạm vi và đặc tả Pha 1 rút gọn](docs/phase1_document/phase1-scope-reduced.md)
-- [Thiết kế domain, database và API gốc](docs/phase1_document/phase1-domain-database-api-contract.md)
-- [Hướng dẫn Swagger](docs/swagger.md)
-- [Migration và kiểm tra CHECK constraint](docs/database-check-constraints.md)
+[Đề bài gốc](docs/phase1_document/Requirement.md) và [đặc tả Pha 1](docs/phase1_document/phase1-scope-reduced.md) được giữ để đối chiếu yêu cầu. Bộ `project-guide` mô tả mã hiện tại; tài liệu thiết kế gốc có thể đề cập các chức năng chưa triển khai.

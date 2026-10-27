@@ -4,7 +4,12 @@
 
 ## 1. Kiểu kiến trúc và lý do lựa chọn
 
-SA Bank Account là modular monolith: một ứng dụng NestJS chứa ba module nghiệp vụ và dùng chung một PostgreSQL. Mỗi module được tổ chức thành presentation, application, domain và infrastructure, với port/adapter tại ranh giới phụ thuộc.
+SA Bank Account là **modular monolith**: một ứng dụng NestJS chứa ba module nghiệp vụ và dùng chung một PostgreSQL. Bên trong ứng dụng, mã nguồn áp dụng các nguyên tắc của **Clean Architecture** và **Hexagonal Architecture (Ports & Adapters)**:
+
+- **Clean Architecture:** phân chia presentation, application, domain và infrastructure. Use case và domain không import NestJS hay Prisma; module NestJS kết nối các thành phần bằng dependency injection.
+- **Hexagonal Architecture:** controller HTTP tiếp nhận yêu cầu và gọi use case; các port định nghĩa hợp đồng mà nghiệp vụ cần, còn adapter hiện thực hợp đồng bằng Prisma, JWT hoặc bcrypt. Ví dụ, `UnitOfWorkPort` được triển khai bởi `PrismaUnitOfWork`.
+
+Modular monolith mô tả cách tổ chức và triển khai hệ thống; Clean Architecture và Hexagonal Architecture mô tả các nguyên tắc tổ chức mã và quản lý dependency. Đây là cách áp dụng các nguyên tắc, không phải khẳng định hệ thống tuân thủ nghiêm ngặt mọi biến thể của hai kiến trúc.
 
 Cách tổ chức này phù hợp phạm vi Pha 1: dễ triển khai và truy vết một request, trong khi nghiệp vụ vẫn được tách khỏi web framework và ORM. Giao dịch chuyển tiền có thể bao trùm cả hai tài khoản trong một DB transaction; chưa cần giải quyết giao dịch phân tán giữa nhiều service.
 

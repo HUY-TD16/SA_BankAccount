@@ -101,7 +101,7 @@ Base URL: /api/v1
 
 ## 5\. Kiến trúc sử dụng
 
-Hệ thống dùng **kiến trúc phân tầng theo module nghiệp vụ**: tầng nghiệp vụ chỉ biết các interface (port), còn Prisma, JWT, bcrypt là phần triển khai bên ngoài.
+Hệ thống là **modular monolith**, áp dụng các nguyên tắc **Clean Architecture** và **Hexagonal Architecture (Ports & Adapters)**. Ba module nghiệp vụ cùng chạy trong một ứng dụng; bên trong, presentation, application, domain và infrastructure được phân lớp. Các use case sử dụng port cho các phụ thuộc cần thiết; adapter triển khai các port bằng Prisma, JWT hoặc bcrypt. Xem [tài liệu kiến trúc](project-guide/01-architecture.md) để biết chi tiết và giới hạn của cách triển khai.
 
 ## 
 

@@ -37,7 +37,7 @@ docker compose ps -a
 
 Kết quả mong đợi: `postgres` healthy → `migrate` exit 0 → `app` healthy. Migration tự chạy bằng `prisma migrate deploy` trước khi app khởi động. API ở `http://localhost:3000/api/v1` nếu giữ cổng mặc định.
 
-Để xem tài liệu, đặt `NODE_ENV=development` trong `.env`, chạy `docker compose up -d`, rồi mở [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json). Nút **Authorize** nhận access token sau đăng nhập, không nhập thêm chữ `Bearer`. Code hiện bật Swagger dựa trên `NODE_ENV`; biến `ENABLE_SWAGGER` trong file mẫu chưa được sử dụng.
+Để xem tài liệu, đặt `NODE_ENV=development` trong `.env`, chạy `docker compose up -d`, rồi mở [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json). Nút **Authorize** nhận access token sau đăng nhập, không nhập thêm chữ `Bearer`. Swagger được bật khi `NODE_ENV` khác `production`.
 
 ```powershell
 docker compose logs --tail 100 app migrate

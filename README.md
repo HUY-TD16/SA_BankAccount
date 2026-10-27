@@ -1,193 +1,178 @@
 # SA Bank Account
 
-**Dịch vụ backend quản lý tài khoản ngân hàng**, xây dựng cho môn Kiến trúc phần mềm. Dự án cung cấp REST API để đăng ký, đăng nhập, mở tài khoản, nạp/rút, chuyển khoản nội bộ, xem lịch sử và đóng tài khoản.
+**Backend quản lý tài khoản ngân hàng và giao dịch nội bộ**, cung cấp REST API cho toàn bộ vòng đời từ đăng ký khách hàng, mở tài khoản đến nạp/rút, chuyển tiền và tra cứu lịch sử.
 
-Trọng tâm của Pha 1 là **tính đúng đắn của số dư và giao dịch khi nhiều yêu cầu chạy đồng thời**. Đây là hệ thống mô phỏng: nạp/rút và tiền gửi ban đầu do hệ thống ghi nhận, chưa kết nối ngân hàng hoặc cổng thanh toán bên ngoài.
+Hệ thống tập trung giải quyết bài toán cốt lõi về **tính toàn vẹn số dư và giao dịch đồng thời trong môi trường mô phỏng độc lập (sandbox)**. Kiến trúc modular monolith áp dụng các nguyên tắc Clean Architecture và Hexagonal Architecture (Ports & Adapters), giúp tổ chức nghiệp vụ rõ ràng, kiểm thử độc lập và quản lý các thao tác tiền trong cùng một database transaction.
 
-> Đọc sâu hơn: [bộ tài liệu dự án](docs/project-guide/README.md). README này trình bày tổng quan; hướng dẫn vận hành và đặc tả chi tiết được tách riêng để dễ tra cứu.
+[Khởi chạy nhanh](#5-khởi-chạy-nhanh) · [Danh sách API](#4-api-chính) · [Tài liệu chi tiết](docs/project-guide/README.md)
 
-## 1. Bài toán và phạm vi
+## 1. Bài toán và tính năng
 
-Một khách hàng có thể sở hữu nhiều tài khoản và thực hiện giao dịch trên từng tài khoản. Nếu hai yêu cầu rút tiền cùng đọc một số dư cũ, hệ thống có thể chi vượt số tiền hiện có. Nếu chuyển khoản chỉ trừ nguồn nhưng chưa cộng đích đã gặp lỗi, dữ liệu sẽ bị lệch. Nếu client gửi lại yêu cầu sau timeout, tiền có thể bị chuyển hai lần.
+Một khách hàng có thể sở hữu nhiều tài khoản, theo dõi số dư và chuyển tiền giữa các tài khoản. Thách thức nằm ở việc giữ dữ liệu nhất quán: hai yêu cầu rút tiền đồng thời phải sử dụng đúng số dư khả dụng; một lệnh chuyển khoản phải hoàn tất cả trừ nguồn và cộng đích; việc gửi lại lệnh sau timeout phải được xử lý có kiểm soát.
 
-Dự án giải quyết các tình huống này bằng kiểm tra quyền sở hữu, biểu diễn tiền chính xác, database transaction, khóa dòng tài khoản và khóa chống lặp cho chuyển khoản.
+SA Bank Account kết hợp kiểm tra quyền sở hữu, tính toán tiền chính xác, khóa dòng và giao dịch nguyên tử để xử lý các tình huống này.
 
-| Nhóm chức năng | Hành vi đã triển khai |
+| Nhóm chức năng | Tính năng cung cấp |
 | --- | --- |
-| Danh tính | Đăng ký bằng email/mật khẩu; đăng nhập nhận JWT |
-| Tài khoản | Mở tài khoản PAYMENT/SAVINGS; xem danh sách, chi tiết, số dư; đóng logic |
-| Nạp/rút | Ghi nhận CREDIT/DEBIT và số dư sau giao dịch |
-| Chuyển khoản | Chuyển VND giữa hai tài khoản nội bộ, kể cả khác chủ sở hữu |
-| Lịch sử | Phân trang; lọc theo loại giao dịch và khoảng thời gian |
-| Hỗ trợ tích hợp | Swagger/OpenAPI, response thống nhất, request ID, Docker |
+| Danh tính khách hàng | Đăng ký bằng email/mật khẩu, đăng nhập và nhận JWT |
+| Quản lý tài khoản | Mở tài khoản PAYMENT/SAVINGS, xem danh sách, chi tiết và số dư |
+| Nạp và rút tiền | Ghi nhận khoản tăng/giảm cùng số dư sau mỗi giao dịch |
+| Chuyển khoản | Chuyển tiền giữa hai tài khoản nội bộ, kể cả khác chủ sở hữu |
+| Tra cứu lịch sử | Phân trang, lọc theo chiều giao dịch và khoảng thời gian |
+| Đóng tài khoản | Đóng logic khi số dư bằng 0, giữ lại lịch sử để tra cứu |
+| Tích hợp | REST API, Swagger/OpenAPI, response thống nhất và request ID |
 
-Luồng sử dụng: **đăng ký → đăng nhập → mở tài khoản → nạp/rút/chuyển tiền → xem lịch sử → đưa số dư về 0 → đóng tài khoản**.
+**Phạm vi thiết kế:** giao dịch nội bộ bằng VND trong sandbox; nạp/rút và tiền gửi ban đầu được mô phỏng trong hệ thống. PAYMENT và SAVINGS dùng chung các quy tắc giao dịch cơ bản.
 
-Chưa triển khai: tính lãi SAVINGS, phí giao dịch, đa tiền tệ, chuyển liên ngân hàng, MFA, refresh token, quên mật khẩu, nghiệp vụ nhân viên và xử lý bất đồng bộ. Các thư mục placeholder không được xem là tính năng hoàn thành.
+Luồng sử dụng điển hình: **đăng ký → đăng nhập → mở tài khoản → nạp/rút/chuyển tiền → xem lịch sử → đóng tài khoản**.
 
 ## 2. Công nghệ
 
-| Thành phần | Công nghệ trong repository | Vai trò |
+| Thành phần | Công nghệ | Vai trò |
 | --- | --- | --- |
-| Runtime, ngôn ngữ | Node.js 24 trong Docker; TypeScript | Chạy backend và mô hình hóa nghiệp vụ |
-| Web framework | NestJS 12, Express adapter | Controller, module, dependency injection |
-| Truy cập dữ liệu | Prisma 7, PostgreSQL driver adapter | Repository, transaction và migration |
-| Database | PostgreSQL 15 trong Compose | Lưu dữ liệu, khóa dòng và ràng buộc toàn vẹn |
+| Ngôn ngữ và runtime | TypeScript, Node.js 24 | Xây dựng backend và mô hình hóa nghiệp vụ |
+| Web framework | NestJS 12, Express adapter | Controller, module và dependency injection |
+| Truy cập dữ liệu | Prisma 7 | Repository, transaction và migration |
+| Cơ sở dữ liệu | PostgreSQL 15 | Lưu trữ, khóa dòng và ràng buộc toàn vẹn |
 | Xác thực | JWT, bcrypt | Access token và băm mật khẩu |
-| Kiểm tra đầu vào | class-validator, class-transformer | Validate body, path và query |
-| Tài liệu API | @nestjs/swagger | Swagger UI và OpenAPI JSON |
-| Đóng gói, kiểm thử | Docker Compose; Jest; Node test runner | Môi trường chạy, unit/integration và HTTP E2E |
+| Validation | class-validator, class-transformer | Kiểm tra và chuyển đổi dữ liệu đầu vào |
+| Tài liệu API | Swagger / OpenAPI | Khám phá và thử API trực tiếp |
+| Đóng gói | Docker, Docker Compose | Khởi chạy ứng dụng cùng database |
+| Kiểm thử | Jest, Node test runner | Unit, integration, hợp đồng API và HTTP E2E |
 
-Phiên bản dependency được khai báo trong [package.json](package.json), khóa cụ thể trong `package-lock.json`. Kiểm thử tải chưa có kịch bản chạy được; k6 chưa phải thành phần đã triển khai.
+Node.js và PostgreSQL trong bảng tương ứng với môi trường Docker của dự án. Dependency được khai báo trong [package.json](package.json) và khóa phiên bản trong [package-lock.json](package-lock.json).
 
-## 3. Kiến trúc tổng quan
+## 3. Kiến trúc và các cơ chế cốt lõi
 
-Ứng dụng là **modular monolith**: các module nghiệp vụ chạy trong một ứng dụng NestJS, dùng chung PostgreSQL. Bên trong mỗi module, mã được chia theo lớp và dùng port/adapter để tách nghiệp vụ khỏi cách truy cập dữ liệu.
+### Tổ chức hệ thống
+
+Ứng dụng sử dụng **modular monolith**: ba module nghiệp vụ chạy trong một ứng dụng NestJS và dùng chung PostgreSQL. Bên trong các module, dự án áp dụng các nguyên tắc của **Clean Architecture** và **Hexagonal Architecture (Ports & Adapters)**:
+
+- **Clean Architecture:** phân chia presentation, application, domain và infrastructure; logic nghiệp vụ hướng vào domain và không phụ thuộc trực tiếp vào NestJS hay Prisma.
+- **Hexagonal Architecture:** các port định nghĩa hợp đồng mà use case cần; adapter triển khai các hợp đồng đó bằng công nghệ cụ thể. Controller HTTP là điểm tiếp nhận yêu cầu từ bên ngoài.
+
+Modular monolith mô tả cách tổ chức và triển khai hệ thống; hai nguyên tắc còn lại mô tả cách tổ chức mã và quản lý dependency bên trong ứng dụng.
 
 ```mermaid
 flowchart LR
-    Client[Client / Swagger] --> HTTP[Controller và DTO]
-    HTTP --> UC[Application: use case]
-    UC --> Domain[Domain: entity, Money, lỗi]
+    Client[Client / Swagger] --> HTTP[Presentation: Controller và DTO]
+    HTTP --> UC[Application: Use case]
+    UC --> Domain[Domain: Entity và Money]
     UC --> Port[Repository / Unit of Work port]
-    Adapter[Infrastructure: Prisma, JWT, bcrypt] -. triển khai .-> Port
+    Adapter[Infrastructure: Adapter] -. triển khai .-> Port
     Adapter --> DB[(PostgreSQL)]
-    DI[NestJS module] -. kết nối phụ thuộc .-> UC
-    DI -. kết nối phụ thuộc .-> Adapter
+    DI[NestJS Dependency Injection] -. kết nối .-> UC
+    DI -. kết nối .-> Adapter
 ```
 
-| Module/lớp | Trách nhiệm |
+| Module | Trách nhiệm |
 | --- | --- |
-| `identity` | Tạo người dùng, kiểm tra mật khẩu, phát JWT |
-| `accounts` | Vòng đời tài khoản và quyền sở hữu |
-| `money-movement` | Nạp/rút, chuyển khoản, truy vấn lịch sử |
-| `presentation` | Nhận HTTP, validate DTO, lấy user từ token, trả response |
-| `application` / `domain` | Điều phối nghiệp vụ, tính tiền, kiểm tra điều kiện và khai báo port |
-| `infrastructure` | Triển khai port bằng Prisma, PostgreSQL, JWT và bcrypt |
-| `common` | Guard, validation, xử lý lỗi, envelope, request ID và logging |
+| `identity` | Quản lý thông tin đăng nhập, kiểm tra mật khẩu và phát JWT |
+| `accounts` | Quản lý tài khoản, quyền sở hữu và vòng đời ACTIVE → CLOSED |
+| `money-movement` | Điều phối nạp/rút, chuyển khoản và truy vấn lịch sử |
 
-Use case phụ thuộc vào interface thay vì gọi Prisma trực tiếp. Các file `*.module.ts` nối use case với implementation qua dependency injection. Nhờ vậy có thể kiểm thử nghiệp vụ bằng fake repository/unit of work, trong khi các test tích hợp kiểm chứng hành vi database thật.
+Controller tiếp nhận và kiểm tra request trước khi gọi use case. Use case thực hiện quy tắc nghiệp vụ thông qua các port; adapter hiện thực các port bằng Prisma, JWT hoặc bcrypt. NestJS module kết nối các thành phần qua dependency injection.
 
-Guard JWT được đăng ký toàn cục; chỉ đăng ký/đăng nhập được đánh dấu public. Quyền sở hữu được kiểm tra trong nghiệp vụ. Với thao tác tiền, unit of work giữ các cập nhật và bản ghi lịch sử trong cùng một transaction.
+Cách phân chia này giúp nghiệp vụ có thể được kiểm thử bằng fake repository/unit of work, đồng thời giữ các kiểm thử database thật ở lớp tích hợp. Các thành phần dùng chung như guard, validation, xử lý lỗi và logging được tập trung trong `common`.
 
-```text
-src/
-  main.ts, app.module.ts       # Khởi động và ghép module
-  common/                     # HTTP, bảo mật, cấu hình, Money
-  modules/
-    identity/
-    accounts/
-    money-movement/           # Mỗi module có các lớp nêu trên
-  infrastructure/prisma/      # Kết nối database
-prisma/                       # Schema và migration SQL
-test/                         # Unit, integration, HTTP E2E
-docs/project-guide/           # Tài liệu chi tiết theo chủ đề
-```
+### Bảo đảm tính nhất quán giao dịch
 
-Xem [kiến trúc và luồng chuyển khoản](docs/project-guide/01-architecture.md).
-
-## 4. Dữ liệu và quy tắc cốt lõi
-
-| Thực thể | Ý nghĩa | Quan hệ chính |
+| Cơ chế | Cách áp dụng | Ý nghĩa |
 | --- | --- | --- |
-| User | Khách hàng và thông tin đăng nhập | Một user có nhiều tài khoản |
-| BankAccount | Số tài khoản, loại, số dư, trạng thái | Thuộc một user; có nhiều giao dịch |
-| FinancialTransaction | Một lần ghi tăng/giảm số dư của một tài khoản | Có thể thuộc một Transfer |
-| Transfer | Một lệnh chuyển tiền nội bộ | Liên kết nguồn, đích, người thực hiện và hai giao dịch đối ứng |
+| **Atomic transaction** | Cập nhật số dư và ghi lịch sử trong cùng DB transaction | Các thay đổi cùng thành công hoặc cùng rollback |
+| **Row-level locking** | Khóa dòng tài khoản khi nạp/rút; khóa hai tài khoản theo thứ tự ID khi chuyển tiền | Kiểm soát truy cập đồng thời và giảm nguy cơ deadlock |
+| **Idempotency** | Áp dụng chuyên biệt cho chuyển khoản theo cặp `(sourceAccountId, idempotencyKey)` | Gửi lại cùng key và payload nhận kết quả đã ghi nhận |
+| **Biểu diễn tiền chính xác** | Tính toán tiền nguyên, truyền giá trị tiền qua API bằng string | Tránh sai số số thực |
+| **Quyền sở hữu** | Xác thực JWT tập trung, kiểm tra chủ tài khoản tại nghiệp vụ | Giới hạn thao tác theo người dùng đã xác thực |
+| **Ràng buộc dữ liệu** | Khóa ngoại, unique và CHECK constraint tại PostgreSQL | Bảo vệ quan hệ và các điều kiện hợp lệ của dữ liệu |
 
-**Tiền:** chỉ dùng VND nguyên, lưu `DECIMAL(18,0)`, tính bằng `bigint` trong `Money`, gửi qua JSON dưới dạng chuỗi như `"100000"`. Amount giao dịch phải dương; tiền gửi ban đầu có thể bằng `0`. Giá trị tiền lưu trữ tối đa là `999999999999999999`.
+Ví dụ, chuyển 100.000 VND từ A sang B tạo một giao dịch ghi giảm ở A và một giao dịch ghi tăng ở B. Hai số dư, lệnh chuyển tiền và hai bản ghi lịch sử nằm trong cùng transaction, giữ nguyên tổng tiền của hai tài khoản sau chuyển khoản.
 
-**Quyền và trạng thái:** chỉ chủ tài khoản được xem, nạp/rút, xem lịch sử hoặc đóng tài khoản đó. Không tồn tại hoặc không thuộc người gọi đều trả `404`. Tài khoản chỉ được đóng khi số dư bằng `0`; đóng logic thành `CLOSED`, giữ lịch sử. Gọi đóng lại trả `204`. Tài khoản SAVINGS hiện có cùng quy tắc giao dịch cơ bản với PAYMENT, chưa có lãi suất.
+Mô hình dữ liệu xoay quanh **User → BankAccount → FinancialTransaction**; **Transfer** liên kết tài khoản nguồn, đích và hai giao dịch đối ứng. Mỗi giao dịch lưu số dư sau khi thực hiện, phục vụ tra cứu diễn biến tiền. Khi tài khoản được đóng, dữ liệu và lịch sử vẫn được giữ lại.
 
-**Nhất quán:** cập nhật số dư và ghi lịch sử cùng commit hoặc rollback. Nạp/rút dùng `SELECT ... FOR UPDATE`; chuyển khoản khóa hai tài khoản theo thứ tự ID. Chuyển 100.000 VND từ A sang B tạo một DEBIT ở A và một CREDIT ở B, tổng số dư hai tài khoản không đổi. Quy tắc bảo toàn này áp dụng cho chuyển nội bộ; nạp/rút làm thay đổi tổng tiền mô phỏng trong hệ thống.
+Chi tiết ranh giới module và luồng xử lý nằm trong [tài liệu kiến trúc](docs/project-guide/01-architecture.md). ERD và các ràng buộc được trình bày tại [tài liệu database](docs/project-guide/02-database.md).
 
-**Chống lặp:** transfer dùng cặp duy nhất `(sourceAccountId, idempotencyKey)`. Lần đầu trả `201`, gửi lại cùng key và payload trả kết quả cũ với `200`. Hiện chưa so sánh payload khi key được dùng lại; client phải giữ nguyên thông tin chuyển tiền khi retry. Nạp/rút chưa có cơ chế này.
+## 4. API chính
 
-**Bảo vệ dữ liệu:** mật khẩu được băm bằng bcrypt; response không chứa password hash. API không có chức năng sửa/xóa giao dịch đã ghi nhận. CHECK constraint bổ sung hàng rào tại DB, nhưng không biến database thành sổ cái bất biến trước mọi thao tác SQL trực tiếp.
+Base URL mặc định: `http://localhost:3000/api/v1`. API sử dụng JSON; các endpoint bảo vệ yêu cầu header `Authorization: Bearer <accessToken>`.
 
-Xem [database và ERD](docs/project-guide/02-database.md), [nghiệp vụ và tình huống biên](docs/project-guide/04-business-rules.md).
+| Method | Endpoint sau `/api/v1` | JWT | Chức năng | Thành công |
+| --- | --- | --- | --- | --- |
+| POST | `/auth/register` | Không | Đăng ký khách hàng | 201 |
+| POST | `/auth/login` | Không | Đăng nhập, nhận access token | 200 |
+| POST | `/accounts` | Có | Mở tài khoản | 201 |
+| GET | `/accounts` | Có | Danh sách tài khoản của mình | 200 |
+| GET | `/accounts/{accountId}` | Có | Chi tiết và số dư tài khoản | 200 |
+| DELETE | `/accounts/{accountId}` | Có | Đóng tài khoản | 204 |
+| POST | `/accounts/{accountId}/transactions` | Có | Nạp hoặc rút tiền | 201 |
+| GET | `/accounts/{accountId}/transactions` | Có | Tra cứu lịch sử giao dịch | 200 |
+| POST | `/transfers` | Có | Chuyển khoản nội bộ | 201 mới / 200 gửi lại |
 
-## 5. Endpoint và quy ước API
+Chuyển khoản nhận ID tài khoản nguồn, số tài khoản đích và header `Idempotency-Key`. Khi thử lại một lệnh chuyển tiền, client giữ nguyên key và toàn bộ payload.
 
-Base URL mặc định: `http://localhost:3000/api/v1`. Body dùng JSON; các endpoint bảo vệ yêu cầu `Authorization: Bearer <accessToken>`.
+Response được chuẩn hóa cho dữ liệu thành công, phân trang và lỗi. Request ID giúp liên kết phản hồi với log để tra cứu một yêu cầu. Riêng thao tác đóng tài khoản thành công trả `204` với body rỗng.
 
-| Method | Path sau `/api/v1` | JWT | Mục đích / kết quả |
-| --- | --- | --- | --- |
-| POST | `/auth/register` | Không | Tạo user — 201 |
-| POST | `/auth/login` | Không | Nhận access token và user — 200 |
-| POST | `/accounts` | Có | Mở tài khoản — 201 |
-| GET | `/accounts` | Có | Danh sách tài khoản của mình — 200 |
-| GET | `/accounts/{accountId}` | Có | Chi tiết tài khoản — 200 |
-| DELETE | `/accounts/{accountId}` | Có | Đóng tài khoản — 204, body rỗng |
-| POST | `/accounts/{accountId}/transactions` | Có | Nạp CREDIT hoặc rút DEBIT — 201 |
-| GET | `/accounts/{accountId}/transactions` | Có | Lịch sử có phân trang — 200 |
-| POST | `/transfers` | Có | Chuyển tiền — 201 mới / 200 replay |
+Xem [hợp đồng API](docs/project-guide/03-api.md) để tra cứu request/response, validation, bộ lọc, mã lỗi và quy tắc retry. Có thể thử trực tiếp bằng [Swagger UI](http://localhost:3000/api/docs) sau khi khởi chạy ở chế độ development.
 
-Ví dụ body mở tài khoản:
+## 5. Khởi chạy nhanh
 
-```json
-{ "accountName": "Chi tiêu", "accountType": "PAYMENT", "initialDeposit": "500000" }
-```
+Cần **Git và Docker có Compose v2**. Các lệnh dưới đây dùng PowerShell; Docker cung cấp môi trường Node.js và PostgreSQL cho ứng dụng.
 
-Ví dụ body chuyển khoản; thay UUID nguồn và số tài khoản đích bằng dữ liệu đã tạo. Gửi thêm header `Idempotency-Key: transfer-demo-20261027-001` (16–128 ký tự sau trim):
-
-```json
-{
-  "sourceAccountId": "81ed4895-3bc6-46c9-b7b2-c0e86b978a10",
-  "destinationAccountNumber": "100000012345",
-  "amount": "100000",
-  "description": "Thanh toán nội bộ"
-}
-```
-
-Đích chuyển khoản được nhập bằng **số tài khoản** (`destinationAccountNumber`), còn nguồn dùng **ID nội bộ** (`sourceAccountId`). Client không tự gửi `userId`, `currentBalance` hoặc `accountNumber` khi mở tài khoản; field ngoài DTO bị từ chối.
-
-Response thành công có dạng `{ "success": true, "data": ..., "meta": { "requestId": "..." } }`. Danh sách có thêm `pagination` cùng cấp với `data`, gồm `page`, `limit`, `total`, `totalPages`. Mặc định trang 1, mỗi trang 20 bản ghi; tối đa 100.
-
-Ví dụ lỗi:
-
-```json
-{
-  "success": false,
-  "error": { "code": "INSUFFICIENT_FUNDS", "message": "Insufficient funds" },
-  "meta": { "requestId": "demo-request-id" }
-}
-```
-
-Lỗi có thể kèm `error.details`. Header `X-Request-Id` giúp đối chiếu response với log. Mã HTTP chính: `400` dữ liệu sai, `401` xác thực thất bại, `404` không tìm thấy/không sở hữu, `409` xung đột nghiệp vụ, `500` lỗi nội bộ với thông báo an toàn.
-
-Hợp đồng từng endpoint, bộ lọc và ví dụ response: [API chi tiết](docs/project-guide/03-api.md). Khi chạy ở môi trường không phải production, mở [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json).
-
-## 6. Khởi chạy nhanh
-
-Cần Git và Docker có Compose v2. Các lệnh dưới đây dùng PowerShell, chạy tại thư mục gốc repository:
+### Chuẩn bị cấu hình
 
 ```powershell
-# Chỉ sao chép khi chưa có .env:
+git clone https://github.com/HUY-TD16/SA_BankAccount.git
+cd SA_BankAccount
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Sửa `.env`: điền `DB_USER`, `DB_PASSWORD`, `DB_NAME` và secret riêng cho `JWT_ACCESS_SECRET`; bảo đảm `DOCKER_DATABASE_URL` trỏ tới `postgres:5432` với đúng thông tin DB. Đặt `NODE_ENV=development` nếu muốn xem Swagger. Không commit secret.
+Nếu đã có mã nguồn, chạy lệnh tạo `.env` tại thư mục gốc dự án. Cấu hình các giá trị sau trước khi khởi động:
+
+| Biến | Cấu hình |
+| --- | --- |
+| `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Thông tin database cho môi trường chạy |
+| `DOCKER_DATABASE_URL` | Kết nối tới `postgres:5432`, dùng cùng thông tin database ở trên |
+| `JWT_ACCESS_SECRET` | Secret riêng để ký access token |
+| `NODE_ENV` | Đặt `development` để sử dụng Swagger |
+| `APP_PORT` | Cổng HTTP trên host, mặc định `3000` |
+
+Giữ secret trong cấu hình môi trường và không commit `.env`. Hướng dẫn URL kết nối, chạy Node.js trên host và xử lý lỗi cấu hình nằm trong [hướng dẫn chạy dự án](docs/project-guide/05-running.md).
+
+### Khởi động và trải nghiệm API
 
 ```powershell
 docker compose up --build -d --wait --wait-timeout 180
 docker compose ps -a
 ```
 
-Compose khởi động PostgreSQL, chạy migration rồi mới chạy app. Trạng thái mong đợi: `postgres` healthy, `migrate` exit 0, `app` healthy. API mặc định ở cổng 3000; `APP_PORT` đổi cổng trên host. Swagger hiện phụ thuộc `NODE_ENV`; biến `ENABLE_SWAGGER` trong file mẫu chưa được sử dụng.
+Compose khởi động PostgreSQL, áp dụng migration rồi chạy ứng dụng. Trạng thái mong đợi: `postgres` healthy, `migrate` exit 0 và `app` healthy.
 
-Để demo: đăng ký và đăng nhập trong Swagger, lấy `data.accessToken`, bấm **Authorize**, tạo hai tài khoản rồi thử nạp/rút/chuyển tiền và đọc lịch sử. Chỉ đóng khi số dư đã về `0`.
+Với cổng mặc định, truy cập [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json). Trong Swagger:
+
+1. Đăng ký và đăng nhập để lấy `data.accessToken`.
+2. Bấm **Authorize**, nhập access token.
+3. Tạo hai tài khoản, thử nạp/rút và chuyển tiền giữa chúng.
+4. Xem số dư, lịch sử; đưa số dư về 0 trước khi đóng tài khoản.
 
 ```powershell
+# Xem log ứng dụng và migration
 docker compose logs --tail 100 app migrate
+# Dừng môi trường; dữ liệu vẫn được giữ trong volume
 docker compose down
 ```
 
-`down` giữ dữ liệu trong volume. Hướng dẫn chạy Node.js trên host, cấu hình URL database và script demo PowerShell: [chạy dự án](docs/project-guide/05-running.md).
+## 6. Kiểm thử
 
-## 7. Kiểm thử, giới hạn và tài liệu
+Các bộ kiểm thử được tổ chức theo phạm vi trách nhiệm:
 
-Repository có unit test bằng Jest, integration test với PostgreSQL, test hợp đồng Swagger và 6 ca HTTP E2E bằng Node test runner. Test mặc định chỉ chạy unit; integration/E2E cần database riêng có tên kết thúc bằng `_test`.
+| Bộ kiểm thử | Nội dung |
+| --- | --- |
+| Unit | Quy tắc nghiệp vụ và các thành phần riêng lẻ |
+| Integration | Repository, transaction và constraint trên PostgreSQL |
+| Swagger contract | Hợp đồng OpenAPI được sinh từ mã nguồn |
+| HTTP E2E | Luồng sử dụng qua HTTP, xác thực, ownership và replay chuyển khoản |
+
+Để chạy unit test và kiểm tra hợp đồng Swagger trên host có Node.js 24:
 
 ```powershell
 npm ci
@@ -196,15 +181,29 @@ npm test -- --runInBand
 npm run test:swagger
 ```
 
-Xem [hướng dẫn kiểm thử](docs/project-guide/06-testing.md) để chuẩn bị DB và chạy integration/E2E. Kiểm thử tải trên Kaggle CPU theo đề bài chưa hoàn thành; chưa có số liệu throughput/latency để kết luận hiệu năng. Healthcheck Docker hiện kiểm tra ứng dụng trả `401` ở route bảo vệ, chưa kiểm tra liên tục khả năng kết nối DB.
+Integration và HTTP E2E sử dụng database riêng có tên kết thúc bằng `_test`. Các bước chuẩn bị môi trường và lệnh chạy từng bộ nằm trong [hướng dẫn kiểm thử](docs/project-guide/06-testing.md).
 
-| Muốn tìm hiểu | Tài liệu |
+## 7. Khám phá mã nguồn và tài liệu
+
+```text
+src/
+  main.ts, app.module.ts       # Khởi động và ghép các module
+  modules/
+    identity/                 # Danh tính và xác thực
+    accounts/                 # Vòng đời tài khoản
+    money-movement/           # Giao dịch tiền và lịch sử
+  common/                     # HTTP, bảo mật, cấu hình và Money
+  infrastructure/prisma/      # Kết nối database dùng chung
+prisma/                       # Schema và migration
+test/                         # Các bộ kiểm thử
+docs/project-guide/           # Hướng dẫn chuyên sâu
+```
+
+| Tài liệu | Nội dung |
 | --- | --- |
-| Ranh giới module, dependency, luồng xử lý | [Kiến trúc](docs/project-guide/01-architecture.md) |
-| ERD, bảng, khóa, constraint, tính nhất quán | [Database](docs/project-guide/02-database.md) |
-| Request, response, validation, lỗi | [API](docs/project-guide/03-api.md) |
-| Use case, quy tắc tiền, retry, đóng tài khoản | [Nghiệp vụ](docs/project-guide/04-business-rules.md) |
-| Docker, chạy local, demo và kiểm thử | [Chạy dự án](docs/project-guide/05-running.md) · [Kiểm thử](docs/project-guide/06-testing.md) |
-| Nhận xét tài liệu giới thiệu ban đầu | [Đánh giá introduce.md](docs/project-guide/07-introduce-review.md) |
-
-[Đề bài gốc](docs/phase1_document/Requirement.md) và [đặc tả Pha 1](docs/phase1_document/phase1-scope-reduced.md) được giữ để đối chiếu yêu cầu. Bộ `project-guide` mô tả mã hiện tại; tài liệu thiết kế gốc có thể đề cập các chức năng chưa triển khai.
+| [Kiến trúc](docs/project-guide/01-architecture.md) | Phân tầng, dependency injection, ranh giới module và luồng chuyển khoản |
+| [Database](docs/project-guide/02-database.md) | ERD, bảng dữ liệu, khóa, index và constraint |
+| [API](docs/project-guide/03-api.md) | Hợp đồng endpoint, ví dụ request/response và xử lý lỗi |
+| [Nghiệp vụ](docs/project-guide/04-business-rules.md) | Use case, quy tắc tiền, vòng đời tài khoản và tình huống đồng thời |
+| [Chạy dự án](docs/project-guide/05-running.md) | Docker, cấu hình local và kịch bản demo |
+| [Kiểm thử](docs/project-guide/06-testing.md) | Chuẩn bị môi trường và thực thi các bộ test |

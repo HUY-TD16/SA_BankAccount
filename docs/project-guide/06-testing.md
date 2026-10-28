@@ -60,18 +60,18 @@ Lỗi thường gặp:
 
 ## 2. Kiểm thử tải trên Kaggle CPU
 
-Kiểm thử tải Pha 1 đã chạy trên **Kaggle CPU ngày 27/10/2026**, gồm login, list account và debit đồng thời trên cùng một tài khoản. Mỗi bài chạy ở **1, 5 và 20 VU**, đo **60 giây/lượt**, lặp **3 lần**, tổng cộng **27 lượt chính thức**; trước mỗi lượt có 10 giây làm nóng riêng.
+Notebook kiểm thử tải Pha 1 hiện dùng **PostgreSQL 15**, cùng phiên bản lớn với Docker. Kịch bản gồm login, list account và debit đồng thời trên cùng một tài khoản. Mỗi bài chạy ở **1, 5 và 20 VU**, đo **60 giây/lượt**, lặp **3 lần**, tổng cộng **27 lượt chính thức**; trước mỗi lượt có 10 giây làm nóng riêng.
 
-Kết quả ghi nhận **76.073 request**, **error rate 0%**; kiểm tra số dư và số bút toán sau cả 27 lượt chính thức và 27 lượt làm nóng đều đạt. Bài rút quá số dư riêng cũng đạt: 10 request thành công, 10 request báo thiếu tiền, số dư cuối bằng 0. Chưa đặt ngưỡng latency nên kết quả này chưa xác nhận mọi yêu cầu về thời gian phản hồi.
+Lần chạy trên **Kaggle CPU ngày 28/10/2026 (UTC)** dùng **PostgreSQL 15.19**, ghi nhận **76.960 request**, **error rate 0%**; kiểm tra số dư và số bút toán sau cả 27 lượt chính thức và 27 lượt làm nóng đều đạt. Bài rút quá số dư riêng cũng đạt: 10 request thành công, 10 request báo thiếu tiền, số dư cuối bằng 0. Chưa đặt ngưỡng latency nên kết quả này chưa xác nhận mọi yêu cầu về thời gian phản hồi.
 
-Môi trường đo dùng CPU AMD EPYC 7B12, 4 CPU logic, giới hạn RAM 30 GiB và PostgreSQL **16.15**. Docker mặc định dùng PostgreSQL **15**. Khi so sánh các lần đo, giữ cùng cấu hình phần cứng, phiên bản phần mềm, dữ liệu đầu vào, workload và cách đo.
+Môi trường đo dùng CPU Intel Xeon @ 2.20 GHz, 4 CPU logic, quota 4 CPU, giới hạn RAM 30 GiB. Khi chạy lại, notebook lưu phần cứng và phiên bản phần mềm thực tế vào `environment.json`. Khi so sánh các lần đo, giữ cùng cấu hình phần cứng, phiên bản phần mềm, dữ liệu đầu vào, workload và cách đo; kiểm tra loại CPU được Kaggle cấp cho mỗi phiên.
 
 Cách chạy lại:
 
-1. Import [notebook](../performance/kaggle-load-test.ipynb) vào Kaggle, chọn **Accelerator=None**, **Internet=On**.
-2. Giữ `MODE = 'smoke'`, chạy lần lượt để kiểm tra môi trường và số dư.
+1. Bắt đầu phiên Kaggle mới, import [notebook](../performance/kaggle-load-test.ipynb), chọn **Accelerator=None**, **Internet=On**.
+2. Giữ `MODE = 'smoke'`, chạy lần lượt để kiểm tra môi trường và số dư. Phần 4 phải in `Database ready: 15.x`.
 3. Khi chạy thử đạt, thêm ô `MODE = 'full'` trước phần 9, rồi chạy lại phần **9 → 10 → 11** và tải ZIP ở phần 11.
 
-Xem [kịch bản và kết quả chi tiết](../performance/phase1-load-test.md), [script k6](../../test/performance/kaggle-load.js) và [cấu hình test](../../test/performance/protocol.json). [ZIP kết quả gốc](../performance/bank-test-20261027-150005-full.zip) lưu cấu hình CPU/RAM, source commit, dữ liệu đầu vào, số VU, thời lượng, throughput, p50/p95/p99, error rate, CPU/RAM API và kiểm tra số dư. Khi đọc ZIP, dùng các file **full**; một số file smoke cũ không đồng bộ.
+Xem [kịch bản và kết quả chi tiết](../performance/phase1-load-test.md), [script k6](../../test/performance/kaggle-load.js) và [cấu hình test](../../test/performance/protocol.json). [ZIP kết quả PostgreSQL 15.19](../performance/bank-test-20261028-163024-full.zip) lưu cấu hình CPU/RAM, source commit, dữ liệu đầu vào, số VU, thời lượng, throughput, p50/p95/p99, error rate, CPU/RAM API và kiểm tra số dư. Dùng các file **full** cho báo cáo chính thức; smoke chỉ dùng để kiểm tra nhanh môi trường.
 
 

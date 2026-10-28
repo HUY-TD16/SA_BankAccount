@@ -184,7 +184,9 @@ npm run test:swagger
 
 Integration và HTTP E2E sử dụng database riêng có tên kết thúc bằng `_test`. Các bước chuẩn bị môi trường và lệnh chạy từng bộ nằm trong [hướng dẫn kiểm thử](docs/project-guide/06-testing.md).
 
-Kiểm thử tải Pha 1 đã chạy trên Kaggle CPU ngày **27/10/2026**, gồm **27 lượt chính thức**, tổng **76.073 request**, error rate **0%** và kiểm tra số dư sau tải đều đạt. Xem [kịch bản và kết quả](docs/performance/phase1-load-test.md), [notebook chạy trên Kaggle](docs/performance/kaggle-load-test.ipynb), [script k6](test/performance/kaggle-load.js) và [cấu hình test](test/performance/protocol.json). Lần đo dùng PostgreSQL **16.15**; Docker mặc định của dự án dùng PostgreSQL **15**.
+Notebook kiểm thử tải Pha 1 hiện dùng PostgreSQL **15**, cùng phiên bản lớn với Docker. Xem [kịch bản và kết quả](docs/performance/phase1-load-test.md), [notebook chạy trên Kaggle](docs/performance/kaggle-load-test.ipynb), [script k6](test/performance/kaggle-load.js) và [cấu hình test](test/performance/protocol.json). Bản vá thực tế được ghi trong `environment.json` của mỗi lần chạy.
+
+Kết quả Kaggle ngày **28/10/2026 (UTC)** được đo trên PostgreSQL **15.19**, CPU **Intel Xeon @ 2.20 GHz**, quota **4 CPU** và giới hạn RAM **30 GiB**: **27 lượt chính thức**, tổng **76.960 request**, error rate **0%** và kiểm tra số dư sau tải đều đạt. Dữ liệu gốc nằm trong [ZIP kết quả](docs/performance/bank-test-20261028-163024-full.zip).
 
 ## 7. Khám phá mã nguồn và tài liệu
 

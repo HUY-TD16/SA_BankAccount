@@ -13,7 +13,7 @@ README cũ ở gốc repository đã có nhiều thông tin vận hành hữu í
 | Nội dung | Đánh giá bản introduce.md | Cách xử lý trong bộ mới |
 | --- | --- | --- |
 | Bài toán | Có chức năng và mục tiêu đúng đắn về tiền | Bổ sung ví dụ race condition, rollback, retry; phân biệt mô phỏng với tiền thật |
-| Công nghệ | Ghi PostgreSQL 16 và k6 | Compose dùng PostgreSQL 15; kiểm thử tải bằng k6 trên Kaggle dùng PostgreSQL 16.15 |
+| Công nghệ | Ghi PostgreSQL 16 và k6 | Compose và notebook Kaggle hiện dùng PostgreSQL 15; lần đo Kaggle ngày 28/10/2026 (UTC) dùng bản 15.19 |
 | Kiến trúc | Chủ yếu một câu mô tả và ảnh nhúng base64 | Nêu modular monolith, port/adapter, DI, trách nhiệm module; sơ đồ Mermaid và sequence |
 | Dữ liệu | Có nguyên tắc tiền nhưng thiếu mô hình dữ liệu | Thêm 4 thực thể, ERD, từ điển bảng và constraint |
 | Endpoint | Danh sách đủ các route chính | Bổ sung payload, phân trang, quy ước response và phân biệt ID/số tài khoản |

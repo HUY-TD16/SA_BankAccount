@@ -38,7 +38,7 @@ Luồng sử dụng điển hình: **đăng ký → đăng nhập → mở tài 
 | Validation | class-validator, class-transformer | Kiểm tra và chuyển đổi dữ liệu đầu vào |
 | Tài liệu API | Swagger / OpenAPI | Khám phá và thử API trực tiếp |
 | Đóng gói | Docker, Docker Compose | Khởi chạy ứng dụng cùng database |
-| Kiểm thử | Jest, Node test runner | Unit, integration, hợp đồng API và HTTP E2E |
+| Kiểm thử | Jest, Node test runner, k6 | Unit, integration, hợp đồng API, HTTP E2E và tải trên Kaggle CPU |
 
 Node.js và PostgreSQL trong bảng tương ứng với môi trường Docker của dự án. Dependency được khai báo trong [package.json](package.json) và khóa phiên bản trong [package-lock.json](package-lock.json).
 
@@ -171,6 +171,7 @@ Các bộ kiểm thử được tổ chức theo phạm vi trách nhiệm:
 | Integration | Repository, transaction và constraint trên PostgreSQL |
 | Swagger contract | Hợp đồng OpenAPI được sinh từ mã nguồn |
 | HTTP E2E | Luồng sử dụng qua HTTP, xác thực, ownership và replay chuyển khoản |
+| Tải trên Kaggle CPU | Login, list account và debit đồng thời; đo throughput, p50/p95/p99, error rate, CPU/RAM API và kiểm tra số dư |
 
 Để chạy unit test và kiểm tra hợp đồng Swagger trên host có Node.js 24:
 
@@ -182,6 +183,8 @@ npm run test:swagger
 ```
 
 Integration và HTTP E2E sử dụng database riêng có tên kết thúc bằng `_test`. Các bước chuẩn bị môi trường và lệnh chạy từng bộ nằm trong [hướng dẫn kiểm thử](docs/project-guide/06-testing.md).
+
+Kiểm thử tải Pha 1 đã chạy trên Kaggle CPU ngày **27/10/2026**, gồm **27 lượt chính thức**, tổng **76.073 request**, error rate **0%** và kiểm tra số dư sau tải đều đạt. Xem [kịch bản và kết quả](docs/performance/phase1-load-test.md), [notebook chạy trên Kaggle](docs/performance/kaggle-load-test.ipynb), [script k6](test/performance/kaggle-load.js) và [cấu hình test](test/performance/protocol.json). Lần đo dùng PostgreSQL **16.15**; Docker mặc định của dự án dùng PostgreSQL **15**.
 
 ## 7. Khám phá mã nguồn và tài liệu
 
@@ -207,3 +210,4 @@ docs/project-guide/           # Hướng dẫn chuyên sâu
 | [Nghiệp vụ](docs/project-guide/04-business-rules.md) | Use case, quy tắc tiền, vòng đời tài khoản và tình huống đồng thời |
 | [Chạy dự án](docs/project-guide/05-running.md) | Docker, cấu hình local và kịch bản demo |
 | [Kiểm thử](docs/project-guide/06-testing.md) | Chuẩn bị môi trường và thực thi các bộ test |
+| [Kiểm thử tải Pha 1](docs/performance/phase1-load-test.md) | Kịch bản Kaggle CPU, kết quả đo và ZIP dữ liệu gốc |

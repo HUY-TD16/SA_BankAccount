@@ -13,7 +13,7 @@ README cũ ở gốc repository đã có nhiều thông tin vận hành hữu í
 | Nội dung | Đánh giá bản introduce.md | Cách xử lý trong bộ mới |
 | --- | --- | --- |
 | Bài toán | Có chức năng và mục tiêu đúng đắn về tiền | Bổ sung ví dụ race condition, rollback, retry; phân biệt mô phỏng với tiền thật |
-| Công nghệ | Ghi PostgreSQL 16 và k6 | Đối chiếu Compose dùng PostgreSQL 15; k6/load test chưa triển khai |
+| Công nghệ | Ghi PostgreSQL 16 và k6 | Compose dùng PostgreSQL 15; kiểm thử tải bằng k6 trên Kaggle dùng PostgreSQL 16.15 |
 | Kiến trúc | Chủ yếu một câu mô tả và ảnh nhúng base64 | Nêu modular monolith, port/adapter, DI, trách nhiệm module; sơ đồ Mermaid và sequence |
 | Dữ liệu | Có nguyên tắc tiền nhưng thiếu mô hình dữ liệu | Thêm 4 thực thể, ERD, từ điển bảng và constraint |
 | Endpoint | Danh sách đủ các route chính | Bổ sung payload, phân trang, quy ước response và phân biệt ID/số tài khoản |
@@ -22,7 +22,7 @@ README cũ ở gốc repository đã có nhiều thông tin vận hành hữu í
 | Bất biến lịch sử | Nêu không sửa/xóa tuyệt đối | Làm rõ API không hỗ trợ; chưa có trigger cấm sửa/xóa trực tiếp ở DB |
 | Đóng tài khoản | Thiếu hành vi gọi lại và đọc lịch sử | Ghi rõ 204 khi đóng lại; vẫn xem được lịch sử của mình |
 | Khởi chạy | Chưa có | Thêm Docker quickstart; local/config/demo đặt ở tài liệu riêng |
-| Kiểm thử | Liệt kê công cụ, chưa tách trạng thái hoàn thành | Tách unit, integration, Swagger, HTTP E2E; không khẳng định có kết quả tải |
+| Kiểm thử | Liệt kê công cụ, chưa tách trạng thái hoàn thành | Tách unit, integration, Swagger, HTTP E2E và tải; dẫn tới [kịch bản và kết quả Kaggle](../performance/phase1-load-test.md) |
 | Trình bày | Escape dấu câu, tiêu đề rỗng, ảnh base64 khó review | Markdown thuần, bảng ngắn, Mermaid và liên kết tương đối |
 
 Ảnh base64 trong Markdown làm file nguồn lớn và khó đọc diff; một số trình render có thể không hiển thị data URI. Mermaid phù hợp để duy trì sơ đồ kiến trúc cùng mã nguồn; nếu nơi xem không hỗ trợ Mermaid có thể xuất thêm SVG/PNG sau.

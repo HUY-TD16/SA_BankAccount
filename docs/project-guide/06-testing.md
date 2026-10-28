@@ -58,12 +58,20 @@ Lỗi thường gặp:
 - E2E báo DB không tồn tại: tạo DB trước; migration không thay thế bước chuẩn bị DB của runner.
 - Swagger không mở: kiểm tra `NODE_ENV`; production hiện không expose Swagger.
 
-## 2. Kiểm thử tải và hướng phát triển Pha 2
+## 2. Kiểm thử tải trên Kaggle CPU
 
-Đề bài yêu cầu kiểm thử tải trên **Kaggle CPU**. Repository hiện chưa có kịch bản chạy được hoặc số liệu; không xem kết quả unit/E2E là bằng chứng hiệu năng.
+Kiểm thử tải Pha 1 đã chạy trên **Kaggle CPU ngày 27/10/2026**, gồm login, list account và debit đồng thời trên cùng một tài khoản. Mỗi bài chạy ở **1, 5 và 20 VU**, đo **60 giây/lượt**, lặp **3 lần**, tổng cộng **27 lượt chính thức**; trước mỗi lượt có 10 giây làm nóng riêng.
 
-Để hoàn tất yêu cầu này, nhóm cần bổ sung workload tối thiểu gồm login, list account và debit đồng thời; lưu cấu hình CPU/RAM, phiên bản source, dữ liệu đầu vào, số client, thời lượng, throughput, p50/p95/p99 và error rate. Khi so sánh Pha 2 phải giữ cùng cấu hình phần cứng, workload và cách đo, đồng thời kiểm tra invariant số dư sau tải.
+Kết quả ghi nhận **76.073 request**, **error rate 0%**; kiểm tra số dư và số bút toán sau cả 27 lượt chính thức và 27 lượt làm nóng đều đạt. Bài rút quá số dư riêng cũng đạt: 10 request thành công, 10 request báo thiếu tiền, số dư cuối bằng 0. Chưa đặt ngưỡng latency nên kết quả này chưa xác nhận mọi yêu cầu về thời gian phản hồi.
 
-Các đề xuất Pha 2 như rate limiting, idempotency có so payload, caching hoặc quan sát metrics/tracing cần được chọn dựa trên kết quả baseline và đánh giá trước/sau, theo yêu cầu đề bài.
+Môi trường đo dùng CPU AMD EPYC 7B12, 4 CPU logic, giới hạn RAM 30 GiB và PostgreSQL **16.15**. Docker mặc định dùng PostgreSQL **15**. Khi so sánh các lần đo, giữ cùng cấu hình phần cứng, phiên bản phần mềm, dữ liệu đầu vào, workload và cách đo.
+
+Cách chạy lại:
+
+1. Import [notebook](../performance/kaggle-load-test.ipynb) vào Kaggle, chọn **Accelerator=None**, **Internet=On**.
+2. Giữ `MODE = 'smoke'`, chạy lần lượt để kiểm tra môi trường và số dư.
+3. Khi chạy thử đạt, thêm ô `MODE = 'full'` trước phần 9, rồi chạy lại phần **9 → 10 → 11** và tải ZIP ở phần 11.
+
+Xem [kịch bản và kết quả chi tiết](../performance/phase1-load-test.md), [script k6](../../test/performance/kaggle-load.js) và [cấu hình test](../../test/performance/protocol.json). [ZIP kết quả gốc](../performance/bank-test-20261027-150005-full.zip) lưu cấu hình CPU/RAM, source commit, dữ liệu đầu vào, số VU, thời lượng, throughput, p50/p95/p99, error rate, CPU/RAM API và kiểm tra số dư. Khi đọc ZIP, dùng các file **full**; một số file smoke cũ không đồng bộ.
 
 

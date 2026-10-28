@@ -66,4 +66,4 @@ Bài riêng chống rút quá số dư cũng đạt: 20 request cùng rút 10.00
 
 [ZIP kết quả gốc](bank-test-20261027-150005-full.zip) chứa cấu hình máy, source, script, dữ liệu đầu vào, CSV/JSON, CPU/RAM, log và kiểm tra số dư. Khi đọc ZIP, dùng các file **full**; một số file smoke cũ đã bị ghi đè một phần và không đồng bộ.
 
-[Script k6](../test/performance/kaggle-load.js) · [Cấu hình test](../test/performance/protocol.json) 
+[Script k6](../../test/performance/kaggle-load.js) · [Cấu hình test](../../test/performance/protocol.json)

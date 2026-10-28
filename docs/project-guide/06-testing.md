@@ -1,8 +1,8 @@
-# Kiểm thử và giới hạn triển khai
+# Kiểm thử
 
 [Mục lục](README.md) · [README dự án](../../README.md)
 
-Các lệnh chạy tại thư mục gốc repository. Tài liệu mô tả bộ kiểm thử hiện có, không phải biên bản xác nhận tất cả test đã chạy thành công.
+Các lệnh chạy tại thư mục gốc repository. Bộ kiểm thử gồm unit, integration, hợp đồng Swagger và HTTP E2E.
 
 ## 1. Kiểm thử
 
@@ -15,7 +15,7 @@ npm test -- --runInBand
 npm run test:swagger
 ```
 
-Unit test kiểm tra nghiệp vụ và các thành phần riêng lẻ; test Swagger kiểm tra tài liệu sinh từ source. Chúng không thay thế E2E qua HTTP thật.
+Unit test kiểm tra nghiệp vụ và các thành phần riêng lẻ; test Swagger kiểm tra tài liệu sinh từ source. HTTP E2E kiểm tra luồng request/response trên ứng dụng đang chạy.
 
 ### E2E qua HTTP thật
 
@@ -57,13 +57,3 @@ Lỗi thường gặp:
 - `Integration tests require a dedicated *_test DATABASE_URL`: đặt URL tới DB test trong đúng terminal đang chạy Jest.
 - E2E báo DB không tồn tại: tạo DB trước; migration không thay thế bước chuẩn bị DB của runner.
 - Swagger không mở: kiểm tra `NODE_ENV`; production hiện không expose Swagger.
-
-## 2. Kiểm thử tải và hướng phát triển Pha 2
-
-Đề bài yêu cầu kiểm thử tải trên **Kaggle CPU**. Repository hiện chưa có kịch bản chạy được hoặc số liệu; không xem kết quả unit/E2E là bằng chứng hiệu năng.
-
-Để hoàn tất yêu cầu này, nhóm cần bổ sung workload tối thiểu gồm login, list account và debit đồng thời; lưu cấu hình CPU/RAM, phiên bản source, dữ liệu đầu vào, số client, thời lượng, throughput, p50/p95/p99 và error rate. Khi so sánh Pha 2 phải giữ cùng cấu hình phần cứng, workload và cách đo, đồng thời kiểm tra invariant số dư sau tải.
-
-Các đề xuất Pha 2 như rate limiting, idempotency có so payload, caching hoặc quan sát metrics/tracing cần được chọn dựa trên kết quả baseline và đánh giá trước/sau, theo yêu cầu đề bài.
-
-

@@ -4,9 +4,9 @@
 
 ## 1. Tác nhân và phạm vi
 
-Tác nhân hiện tại là khách hàng sử dụng REST API. Một khách hàng có thể mở nhiều tài khoản; mỗi tài khoản thuộc đúng một khách hàng. Nguồn chuyển khoản phải thuộc người gọi, đích có thể thuộc khách hàng khác.
+Tác nhân là khách hàng sử dụng REST API. Một khách hàng có thể mở nhiều tài khoản; mỗi tài khoản thuộc đúng một khách hàng. Nguồn chuyển khoản phải thuộc người gọi, đích có thể thuộc khách hàng khác.
 
-Nạp, rút và tiền gửi ban đầu là thao tác mô phỏng, không có đối soát tiền mặt, cổng thanh toán hoặc phê duyệt nhân viên. Loại SAVINGS chưa có kỳ hạn/lãi suất hay hạn chế rút riêng. Vì vậy các thao tác này không thể được hiểu như một hệ thống ngân hàng thực đã tích hợp dòng tiền bên ngoài.
+Nạp, rút và tiền gửi ban đầu là thao tác mô phỏng: hệ thống ghi nhận số dư và lịch sử trong database. PAYMENT và SAVINGS dùng chung quy tắc nạp, rút, chuyển tiền và đóng tài khoản; giao dịch không tính lãi hoặc áp dụng kỳ hạn.
 
 ## 2. Danh sách use case
 
@@ -21,7 +21,7 @@ Nạp, rút và tiền gửi ban đầu là thao tác mô phỏng, không có đ
 | UC-07 Đóng tài khoản | Tài khoản thuộc mình, balance = 0 | Chuyển CLOSED và lưu closed_at; gọi lại vẫn 204 |
 | UC-08 Chuyển khoản | Nguồn thuộc mình, đích hợp lệ, amount > 0, key hợp lệ | Atomic transfer và hai bút toán; 201 mới hoặc 200 replay |
 
-Định dạng đầu vào và response ở [API](03-api.md). Việc email được chuẩn hóa trong use case không có nghĩa mọi chuỗi email có khoảng trắng ngoài đều qua HTTP validation; client nên gửi email hợp lệ, không có khoảng trắng thừa.
+Định dạng đầu vào và response ở [API](03-api.md). Email đi qua HTTP validation trước khi được chuẩn hóa trong use case. Client gửi email hợp lệ, không có khoảng trắng thừa.
 
 ## 3. Vòng đời tài khoản
 
@@ -59,18 +59,18 @@ Nếu tài khoản có 100.000 và hai request cùng rút 80.000, khóa dòng kh
 
 Chuyển khoản khóa hai account theo ID tăng dần, bất kể chiều chuyển. Các request trên cùng tài khoản được tuần tự hóa ở hàng dữ liệu, không khóa toàn bộ hệ thống.
 
-Client tạo `Idempotency-Key` 16–128 ký tự cho mỗi ý định chuyển khoản mới, giữ nguyên key và payload khi gửi lại sau timeout. Khóa có phạm vi theo tài khoản nguồn, không phải toàn bộ người dùng. Chưa có thời hạn hết hiệu lực key trong schema hiện tại.
+Client tạo `Idempotency-Key` 16–128 ký tự cho mỗi ý định chuyển khoản mới, giữ nguyên key và payload khi gửi lại sau timeout. Khóa có phạm vi theo tài khoản nguồn và được lưu cùng transfer; schema không quy định thời điểm hết hiệu lực của key.
 
-Thứ tự replay hiện tại cần hiểu chính xác:
+Thứ tự xử lý replay:
 
 1. Tra đích bằng số tài khoản và loại trường hợp nguồn trùng đích.
 2. Khóa hai account, xác minh quyền sở hữu nguồn.
 3. Tra transfer cũ theo nguồn và key; nếu có thì trả kết quả cũ.
 4. Chỉ với transfer mới mới kiểm tra trạng thái nguồn/đích, số dư và thực hiện ghi.
 
-Vì vậy replay cùng payload vẫn có thể thành công sau khi nguồn hoặc đích đã đóng. Nhưng đây không phải cơ chế trả kết quả cũ bất kể payload: đổi đích sang số không tồn tại hoặc nguồn trùng đích có thể lỗi trước bước tìm key. Nếu payload thay đổi nhưng vượt các bước đầu, hệ thống có thể trả transfer cũ mà không báo xung đột. Class `IdempotencyKeyReusedError` có trong mã nhưng chưa được gọi trong luồng transfer.
+Replay cùng payload có thể thành công sau khi nguồn hoặc đích đã đóng. Đổi đích sang số không tồn tại hoặc nguồn trùng đích có thể gây lỗi trước bước tìm key. Khi các bước kiểm tra đầu thành công, hệ thống tìm kết quả theo nguồn và key, không so sánh payload; do đó payload khác vẫn có thể nhận lại transfer cũ.
 
-Nạp/rút chưa có idempotency key; gửi lại POST có thể tạo giao dịch mới. Mở tài khoản cũng không có chống lặp theo key. Khi không rõ request đã hoàn tất hay chưa, cần kiểm tra dữ liệu/lịch sử trước khi thao tác lại; không giả định mọi POST đều chống lặp.
+Nạp/rút và mở tài khoản xử lý mỗi POST như một yêu cầu riêng. Gửi lại request có thể tạo thêm giao dịch hoặc tài khoản. Nếu mất phản hồi, kiểm tra dữ liệu và lịch sử trước khi thao tác lại.
 
 ## 6. Kịch bản demo có kết quả mong đợi
 
@@ -89,6 +89,6 @@ Nạp/rút chưa có idempotency key; gửi lại POST có thể tạo giao dị
 
 Có thể tạo B dưới user thứ hai để kiểm tra chuyển khác chủ. Khi đó mọi thao tác xem/nạp/rút trên B phải dùng JWT của chủ B. Dùng token A xem B phải nhận 404, trong khi chuyển A→B vẫn được phép.
 
-## 7. Ngoài phạm vi hiện tại
+## 7. Phạm vi giao dịch
 
-Chưa có hoàn tiền, hủy giao dịch, lãi suất, phí, kiểm tra hạn mức theo ngày, KYC, duyệt giao dịch, nhân viên, đa tiền tệ, ledger bất biến ở cấp DB hoặc lưu lịch sử lệnh thất bại. Đây là hướng mở rộng, không phải cam kết hành vi của Pha 1.
+Các nghiệp vụ trên áp dụng cho giao dịch nội bộ bằng VND. Giao dịch được ghi nhận trực tiếp khi thành công, không qua bước phê duyệt. Chuyển khoản không tính phí; lệnh thất bại rollback và không tạo bản ghi giao dịch. Tài khoản CLOSED giữ thông tin và lịch sử để tra cứu; vòng đời tài khoản không có thao tác mở lại.

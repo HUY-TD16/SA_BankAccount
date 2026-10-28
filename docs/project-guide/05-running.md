@@ -48,7 +48,7 @@ docker compose up --build -d --wait --wait-timeout 180
 
 `down` giữ dữ liệu trong named volume; `down --volumes` xóa dữ liệu. Đổi thông tin DB trong `.env` không tự đổi user/database trong volume đã khởi tạo. Để kiểm tra máy sạch, dùng project riêng (`docker compose -p sa-bankaccount-clean ...`) và cổng riêng; giữ cùng tên project trong mọi lệnh của lần kiểm tra.
 
-Image dùng build nhiều stage, chạy bằng user `node`, không chép `.env` vào image. Healthcheck app kiểm tra route bảo vệ trả `401` sau bootstrap; đây là liveness check, không phải kiểm tra kết nối DB liên tục.
+Image dùng build nhiều stage, chạy bằng user `node`, không chép `.env` vào image. Healthcheck app kiểm tra route bảo vệ trả `401` sau bootstrap để xác nhận ứng dụng đang phục vụ HTTP. Kết nối DB được sử dụng khi ứng dụng thực hiện truy vấn; healthcheck này không truy vấn DB.
 
 ## 2. Chạy phát triển trên host
 

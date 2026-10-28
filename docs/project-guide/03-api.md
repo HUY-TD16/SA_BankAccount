@@ -24,7 +24,7 @@ Mỗi phần bên dưới mô tả giá trị **bên trong `data`**; không bỏ
 
 ### POST /auth/register
 
-Không cần JWT. Tạo user, trả **201**, chưa cấp token tự động.
+Không cần JWT. Tạo user, trả **201**. Client gọi `/auth/login` để nhận access token.
 
 | Field | Điều kiện |
 | --- | --- |
@@ -42,7 +42,7 @@ Không cần JWT. Tạo user, trả **201**, chưa cấp token tự động.
 }
 ```
 
-`data` gồm `id`, `email`, `fullName`, **`createAt`** (đúng tên field hiện tại, không phải `createdAt`). Không có password/passwordHash. Email trùng trả `409 EMAIL_EXISTS`; sai xác nhận/DTO trả `400 VALIDATION_ERROR`.
+`data` gồm `id`, `email`, `fullName`, **`createAt`** (tên thuộc tính trong response). Không có password/passwordHash. Email trùng trả `409 EMAIL_EXISTS`; sai xác nhận/DTO trả `400 VALIDATION_ERROR`.
 
 ### POST /auth/login
 
@@ -52,7 +52,7 @@ Không cần JWT. Body:
 { "email": "customer@example.com", "password": "DemoTest123!" }
 ```
 
-Thành công **200**, `data` gồm `accessToken` và `user` với cùng hình dạng user nêu trên. Sai email hoặc mật khẩu cùng trả `401 INVALID_CREDENTIALS`. Hạn token theo `JWT_ACCESS_TTL`, mặc định `60m`; chưa có refresh/logout endpoint.
+Thành công **200**, `data` gồm `accessToken` và `user` với cùng hình dạng user nêu trên. Sai email hoặc mật khẩu cùng trả `401 INVALID_CREDENTIALS`. Hạn token theo `JWT_ACCESS_TTL`, mặc định `60m`. Khi token hết hạn, client đăng nhập để nhận token mới.
 
 ## 3. Tài khoản
 
@@ -107,7 +107,7 @@ Ví dụ: `/accounts?page=1&limit=20&status=ACTIVE`. `data` là mảng account v
 }
 ```
 
-Hiện `totalPages` tối thiểu bằng 1, kể cả không có bản ghi. Phân trang dùng offset; khi dữ liệu thay đổi giữa các lần đọc trang, không nên coi kết quả là một snapshot bất biến.
+`totalPages` tối thiểu bằng 1, kể cả không có bản ghi. Phân trang dùng offset; mỗi lần đọc trang lấy dữ liệu tại thời điểm truy vấn.
 
 ### GET /accounts/{accountId}
 
@@ -150,7 +150,7 @@ Thành công **201**, `data` là giao dịch:
 }
 ```
 
-Thiếu tiền trả `409 INSUFFICIENT_FUNDS`; tài khoản đã đóng trả `409 ACCOUNT_NOT_ACTIVE`; không tồn tại/không sở hữu trả 404. Nạp làm số dư vượt giới hạn lưu trữ trả 400. Endpoint này **chưa chống lặp theo Idempotency-Key**; POST lại có thể thực hiện thêm một lần.
+Thiếu tiền trả `409 INSUFFICIENT_FUNDS`; tài khoản đã đóng trả `409 ACCOUNT_NOT_ACTIVE`; không tồn tại/không sở hữu trả 404. Nạp làm số dư vượt giới hạn lưu trữ trả 400. Endpoint này xử lý mỗi POST như một yêu cầu giao dịch riêng; gửi lại POST có thể thực hiện thêm một lần, kể cả khi gửi cùng Idempotency-Key.
 
 ### GET /accounts/{accountId}/transactions
 
@@ -164,7 +164,7 @@ Cần JWT và quyền sở hữu, kể cả account CLOSED. Trả **200**, `data
 
 Ví dụ: `/accounts/{accountId}/transactions?type=DEBIT&from=2026-10-01T00:00:00.000Z&to=2026-10-31T23:59:59.999Z&page=1&limit=20`.
 
-Sắp xếp `createdAt DESC, id DESC`. Bộ lọc CREDIT bao gồm cả tiền nạp, opening deposit và transfer in; DEBIT gồm rút và transfer out. Chưa có query `referenceType`. Chưa kiểm tra chéo `from <= to`; khoảng ngược có thể cho danh sách rỗng thay vì lỗi validation. Nên dùng thời gian có hậu tố Z hoặc offset rõ ràng.
+Sắp xếp `createdAt DESC, id DESC`. Bộ lọc CREDIT bao gồm cả tiền nạp, opening deposit và transfer in; DEBIT gồm rút và transfer out. Query hỗ trợ lọc theo `type`, `from` và `to`. Hai mốc thời gian được kiểm tra định dạng riêng, không kiểm tra chéo `from <= to`; khoảng ngược có thể trả danh sách rỗng. Gửi thời gian có hậu tố Z hoặc offset rõ ràng.
 
 ## 5. Chuyển khoản
 
@@ -215,7 +215,7 @@ Thành công **201** nếu mới, **200** nếu replay. `data` là transfer, kh�
 
 Lỗi chính: thiếu/sai header trả `400 HTTP_ERROR`; nguồn trùng đích trả `400 SAME_ACCOUNT_TRANSFER`; nguồn không sở hữu, đích không tồn tại hoặc đích CLOSED với chuyển mới trả 404; nguồn CLOSED với chuyển mới hoặc thiếu tiền trả 409.
 
-**Giới hạn replay:** server chưa so sánh payload/hash khi trùng key. Nó tra đích và kiểm tra nguồn khác đích trước bước tìm transfer cũ. Do đó không cam kết `409` khi tái sử dụng key với dữ liệu khác. Replay cùng payload được kiểm tra quyền sở hữu, nhưng không bị chặn chỉ vì tài khoản đã đóng sau giao dịch. Xem [thứ tự xử lý](04-business-rules.md).
+**Quy tắc replay:** server tra đích và kiểm tra nguồn khác đích trước bước tìm transfer cũ. Việc nhận diện transfer cũ dựa trên nguồn và key, không so sánh payload/hash. Khi key được dùng với dữ liệu khác, kết quả phụ thuộc các bước kiểm tra này và có thể là transfer cũ thay vì lỗi `409`. Replay cùng payload được kiểm tra quyền sở hữu, nhưng không bị chặn chỉ vì tài khoản đã đóng sau giao dịch. Xem [thứ tự xử lý](04-business-rules.md).
 
 ## 6. Mã lỗi
 

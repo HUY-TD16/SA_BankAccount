@@ -4,7 +4,7 @@
 
 ## 1. Mô hình dữ liệu
 
-PostgreSQL lưu bốn bảng chính. [Prisma schema](../../prisma/schema.prisma) ánh xạ tên camelCase trong mã sang snake_case trong SQL. ID được tạo bằng UUID ở Prisma nhưng cột hiện khai báo `String`, không có `@db.Uuid`; migration ban đầu dùng TEXT. Không nên nhầm định dạng UUID của API với kiểu vật lý UUID trong PostgreSQL.
+PostgreSQL lưu bốn bảng chính. [Prisma schema](../../prisma/schema.prisma) ánh xạ tên camelCase trong mã sang snake_case trong SQL. ID được tạo theo định dạng UUID ở Prisma, khai báo bằng `String` trong schema và lưu bằng kiểu TEXT trong migration ban đầu.
 
 ```mermaid
 erDiagram
@@ -81,7 +81,7 @@ Tiền gửi ban đầu bằng 0 không tạo OPENING_DEPOSIT, vì amount giao d
 | status | COMPLETED | Chỉ lưu chuyển khoản hoàn tất |
 | created_at | TIMESTAMPTZ | Thời điểm ghi nhận |
 
-Không có bản ghi FAILED/PENDING trong luồng hiện tại. Lỗi làm rollback, nên không tạo lịch sử chuyển thất bại trong bảng này.
+Bảng lưu các transfer COMPLETED. Khi xử lý thất bại, transaction rollback và không lưu bản ghi transfer.
 
 ## 3. Khóa, index và CHECK constraint
 
@@ -94,7 +94,7 @@ Không có bản ghi FAILED/PENDING trong luồng hiện tại. Lỗi làm rollb
 | Index account `(user_id, status, created_at DESC)` | Hỗ trợ danh sách tài khoản theo chủ/trạng thái |
 | Index transaction `(account_id, created_at DESC, id DESC)` | Hỗ trợ lịch sử theo tài khoản và thứ tự ổn định |
 
-Các giao dịch không có `transfer_id` vẫn được ghi nhiều lần vì unique của PostgreSQL cho phép nhiều giá trị NULL. Khóa ngoại từ account tới user, transaction tới account và transfer tới các account/user dùng `onDelete: Restrict`. Quan hệ tùy chọn transaction → transfer dùng ON DELETE SET NULL trong migration ban đầu; không nên suy diễn rằng mọi FK đều cấm xóa giống nhau.
+Các giao dịch không có `transfer_id` vẫn được ghi nhiều lần vì unique của PostgreSQL cho phép nhiều giá trị NULL. Khóa ngoại từ account tới user, transaction tới account và transfer tới các account/user dùng `onDelete: Restrict`. Quan hệ tùy chọn transaction → transfer dùng ON DELETE SET NULL trong migration ban đầu.
 
 Migration [add_domain_check_constraints](../../prisma/migrations/20261020000000_add_domain_check_constraints/migration.sql) thêm 9 CHECK:
 
@@ -108,13 +108,13 @@ Migration [add_domain_check_constraints](../../prisma/migrations/20261020000000_
 8. Amount chuyển khoản lớn hơn 0.
 9. Nguồn và đích chuyển khoản khác nhau.
 
-Các CHECK được đặt bằng SQL migration, không thể suy ra đầy đủ chỉ từ Prisma schema. Chúng kiểm tra cả dữ liệu hiện có khi áp dụng; dữ liệu vi phạm làm migration thất bại thay vì tự sửa tiền.
+Các CHECK được định nghĩa trong SQL migration. Chúng kiểm tra cả dữ liệu hiện có khi áp dụng; dữ liệu vi phạm làm migration thất bại thay vì tự sửa tiền.
 
-## 4. Những điều database chưa tự bảo đảm
+## 4. Phân chia kiểm tra dữ liệu giữa database và nghiệp vụ
 
-Database có FK/unique/CHECK nhưng chưa tự chứng minh tổng tiền bảo toàn, transfer có đủ hai dòng đối ứng, amount hai dòng bằng amount transfer, hoặc `balance_after` khớp số dư cập nhật. Những điều này do use case và transaction thực hiện, cần được kiểm chứng bằng test.
+Database kiểm tra quan hệ bằng FK, tính duy nhất bằng unique và điều kiện trên từng dòng bằng CHECK. Use case thực hiện quy tắc bảo toàn tổng tiền, tạo hai dòng đối ứng có cùng amount với transfer và ghi `balance_after` theo số dư cập nhật. Các thao tác này nằm trong cùng transaction.
 
-Tương tự, chưa có trigger cấm UPDATE/DELETE lịch sử. Tính bất biến hiện là quy ước qua API và cách ghi của ứng dụng. Quyền quản trị SQL trực tiếp vẫn có khả năng thay đổi dữ liệu.
+Ứng dụng cung cấp thao tác ghi và đọc lịch sử, không cung cấp API sửa/xóa. Database không có trigger chặn UPDATE/DELETE lịch sử; người có quyền SQL tương ứng vẫn có thể thay đổi các bản ghi.
 
 `DECIMAL(18,0)` lưu số nguyên chính xác; JSON dùng string để tránh vượt vùng số nguyên an toàn của JavaScript. Client không chuyển tiền sang `number` để tính toán. Ngày giờ lưu TIMESTAMPTZ và response dùng chuỗi ISO; nên gửi bộ lọc thời gian có múi giờ rõ ràng.
 

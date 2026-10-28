@@ -1,0 +1,24 @@
+{
+  "id": "sa-bank-phase1-kaggle-v1",
+  "workloads": ["login", "list", "debit"],
+  "vus": [1, 5, 20],
+  "repeats": 3,
+  "duration": "60s",
+  "warmup": "10s",
+  "cooldown_seconds": 2,
+  "think_time_seconds": 0.1,
+  "request_timeout": "30s",
+  "graceful_stop": "35s",
+  "fixture": {
+    "users": 1,
+    "accounts": 20,
+    "account_type": "PAYMENT",
+    "currency": "VND",
+    "initial_balance_per_account": "1000000000",
+    "debit_amount": "1",
+    "list_page": 1,
+    "list_limit": 20,
+    "reset_before_each_run": true
+  },
+  "error_threshold": "rate<0.01"
+}

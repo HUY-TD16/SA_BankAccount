@@ -12,6 +12,7 @@ Bộ tài liệu mô tả kiến trúc, dữ liệu, hợp đồng API, quy tắ
 | [04 — Nghiệp vụ](04-business-rules.md) | Use case, điều kiện, kết quả, retry và tình huống đồng thời | Người tìm hiểu bài toán |
 | [05 — Chạy dự án](05-running.md) | Docker, môi trường local, demo PowerShell | Người chạy thử |
 | [06 — Kiểm thử](06-testing.md) | Unit, integration, Swagger contract và HTTP E2E | Người kiểm chứng hệ thống |
+| [08 — Các tình huống và cơ chế xử lý](08-problem-scenarios.md) | Ví dụ, nguy cơ, cách xử lý, kết quả và mã nguồn liên quan | Người tìm hiểu nghiệp vụ và kiểm thử |
 
 Lộ trình đọc: README → nghiệp vụ → kiến trúc → database. Khi cần chạy demo, đọc phần chạy dự án rồi dùng tài liệu API. Các lệnh shell đều chạy tại thư mục gốc repository, trừ khi ghi rõ khác.
 

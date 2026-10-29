@@ -184,9 +184,27 @@ npm run test:swagger
 
 Integration và HTTP E2E sử dụng database riêng có tên kết thúc bằng `_test`. Các bước chuẩn bị môi trường và lệnh chạy từng bộ nằm trong [hướng dẫn kiểm thử](docs/project-guide/06-testing.md).
 
+### Kết quả kiểm thử tải trên Kaggle CPU
+
 Notebook kiểm thử tải Pha 1 hiện dùng PostgreSQL **15**, cùng phiên bản lớn với Docker. Xem [kịch bản và kết quả](docs/performance/phase1-load-test.md), [notebook chạy trên Kaggle](docs/performance/kaggle-load-test.ipynb), [script k6](test/performance/kaggle-load.js) và [cấu hình test](test/performance/protocol.json). Bản vá thực tế được ghi trong `environment.json` của mỗi lần chạy.
 
 Kết quả Kaggle ngày **28/10/2026 (UTC)** được đo trên PostgreSQL **15.19**, CPU **Intel Xeon @ 2.20 GHz**, quota **4 CPU** và giới hạn RAM **30 GiB**: **27 lượt chính thức**, tổng **76.960 request**, error rate **0%** và kiểm tra số dư sau tải đều đạt. Dữ liệu gốc nằm trong [ZIP kết quả](docs/performance/bank-test-20261028-163024-full.zip).
+
+Mỗi mức tải đo **60 giây/lượt**, làm nóng riêng **10 giây**, lặp **3 lần**. Bảng lấy **median từng chỉ số qua ba lần chạy**, không tính lại percentile trên dữ liệu gộp. VU là số client ảo hoạt động đồng thời.
+
+| Bài test | VU | Request/giây | p50 (ms) | p95 (ms) | p99 (ms) | CPU API (%) |
+|---|---:|---:|---:|---:|---:|---:|
+| Đăng nhập | 1 | 2,50 | 297,08 | 309,99 | 321,65 | 74,18 |
+| Đăng nhập | 5 | 10,86 | 352,83 | 388,96 | 422,55 | 369,32 |
+| Đăng nhập | 20 | 11,34 | 1.649,11 | 1.736,08 | 1.783,00 | 388,99 |
+| Xem tài khoản | 1 | 9,49 | 3,89 | 4,37 | 4,91 | 3,64 |
+| Xem tài khoản | 5 | 47,17 | 4,49 | 6,19 | 8,61 | 14,80 |
+| Xem tài khoản | 20 | 188,60 | 4,27 | 7,40 | 15,70 | 49,54 |
+| Rút tiền | 1 | 8,88 | 11,11 | 13,12 | 16,57 | 6,11 |
+| Rút tiền | 5 | 44,52 | 10,76 | 13,25 | 21,30 | 24,82 |
+| Rút tiền | 20 | 99,44 | 44,74 | 324,30 | 582,51 | 61,80 |
+
+CPU 100% tương đương một CPU logic; login ở 20 VU sử dụng khoảng **3,89 CPU**. RSS của API cao nhất quan sát được là **445,18 MiB**.
 
 ## 7. Khám phá mã nguồn và tài liệu
 

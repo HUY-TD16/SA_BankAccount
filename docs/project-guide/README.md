@@ -6,7 +6,7 @@ Bộ tài liệu mô tả kiến trúc, dữ liệu, hợp đồng API, quy tắ
 
 | Tài liệu | Nội dung | Đối tượng đọc |
 | --- | --- | --- |
-| [01 — Kiến trúc](01-architecture.md) | Module, các lớp, dependency, transaction và luồng request | Người đánh giá thiết kế, lập trình viên |
+| [01 — Kiến trúc](01-architecture.md) | Module, các lớp, dependency, transaction, sơ đồ luồng request và các bước bảo mật (JWT, DTO, quyền sở hữu, bcrypt) | Người đánh giá thiết kế, lập trình viên |
 | [02 — Database](02-database.md) | ERD, từ điển dữ liệu, index, constraint, migration | Người phát triển và quản lý dữ liệu |
 | [03 — API](03-api.md) | Đầy đủ 9 endpoint, request/response, lỗi, phân trang | Người tích hợp client, kiểm thử |
 | [04 — Nghiệp vụ](04-business-rules.md) | Use case, điều kiện, kết quả, retry và tình huống đồng thời | Người tìm hiểu bài toán |

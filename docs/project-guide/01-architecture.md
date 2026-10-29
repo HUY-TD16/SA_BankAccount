@@ -256,16 +256,88 @@ Ví dụ, `TransferMoneyUseCase` nhận `UnitOfWorkPort`; `MoneyMovementModule` 
 
 ## 5. Luồng HTTP và bảo mật
 
-1. Middleware gắn request ID để liên kết response và log.
-2. Guard toàn cục kiểm tra Bearer token, ngoại trừ route `@Public()`.
-3. Validation pipe chuyển query sang kiểu mong đợi, kiểm tra DTO và từ chối field ngoài hợp đồng.
-4. Controller lấy danh tính đã xác thực, gọi use case.
-5. Use case kiểm tra ownership và điều kiện nghiệp vụ, gọi port để đọc/ghi.
-6. Interceptor bọc dữ liệu thành envelope; lỗi đi qua exception filter. HTTP logging interceptor ghi thông tin request.
+### 5.1. Request đi từ đâu đến đâu?
 
-Đây là luồng khái niệm; interceptor bao quanh xử lý controller. Filter chỉ ánh xạ lỗi sang HTTP, không chịu trách nhiệm rollback. Khi callback transaction thất bại, Prisma rollback trước khi lỗi được trả về client.
+```mermaid
+flowchart TD
+    Client["Client gửi HTTP request"] --> Middleware["Middleware: gắn requestId"]
+    Middleware --> Guard{"AccessTokenGuard: route public<br/>hoặc JWT hợp lệ?"}
+    Guard -->|Không| Filter["GlobalExceptionFilter: chuẩn hóa lỗi và ghi log"]
+    Guard -->|Có| Entry["Interceptor chiều vào: bắt đầu đo thời gian"]
+    Entry --> Validation{"ValidationPipe: dữ liệu đúng DTO?"}
+    Validation -->|Không| Filter
+    Validation -->|Có| Controller["Controller: lấy DTO và danh tính đã xác thực"]
+    Controller --> UseCase["Use case: kiểm tra quyền và nghiệp vụ, sử dụng Domain"]
+    UseCase -->|Gọi thao tác qua Port| Adapter["Infrastructure Adapter"]
+    Adapter --> DB[(PostgreSQL)]
+    DB -->|Dữ liệu / kết quả| Adapter
+    Adapter -->|Kết quả| UseCase
+    UseCase -->|Thành công| Response["Controller trả kết quả<br/>Interceptor bọc response và ghi log"]
+    Controller -. Lỗi .-> Filter
+    UseCase -. Lỗi .-> Filter
+    Response --> Out["Client nhận HTTP response"]
+    Filter --> Out
+```
+
+Sơ đồ áp dụng cho các API controller của ứng dụng. Nhánh PostgreSQL minh họa adapter dữ liệu; adapter bcrypt hoặc JWT thực hiện tác vụ riêng, không cần đọc/ghi database.
+
+1. **Middleware:** gắn request ID để liên kết response và log.
+2. **Guard:** xác thực Bearer token trước khi chạy phương thức controller. Route `@Public()` được bỏ qua yêu cầu JWT.
+3. **Interceptor chiều vào:** bắt đầu đo thời gian xử lý sau guard, trước validation pipe.
+4. **Validation pipe:** chuyển đổi dữ liệu theo cấu hình DTO, kiểm tra ràng buộc và từ chối field ngoài hợp đồng.
+5. **Controller:** nhận dữ liệu đã kiểm tra, lấy danh tính đã xác thực và gọi use case. Controller có thể kiểm tra thêm header, như `Idempotency-Key` của chuyển tiền.
+6. **Use case:** điều phối chức năng, sử dụng Domain và gọi các thao tác được định nghĩa bởi Port. Adapter được inject sẽ thực thi các thao tác này.
+7. **Chiều trả về:** kết quả đi về controller; response interceptor bọc envelope và HTTP logging interceptor ghi request thành công. Nếu có lỗi được ném ra, exception filter chuẩn hóa response lỗi và ghi log.
+
+Use case có thể đọc dữ liệu qua adapter để kiểm tra quyền và nghiệp vụ rồi mới ghi dữ liệu. Domain và Port không phải hai dịch vụ được gọi đồng thời. Port là interface, không có một bước xử lý runtime riêng; NestJS DI nối use case với adapter khi khởi tạo ứng dụng.
+
+Filter chỉ ánh xạ lỗi sang HTTP, không chịu trách nhiệm rollback. Khi callback transaction thất bại, Prisma rollback trước khi lỗi được trả về client. Lỗi guard xảy ra trước interceptor nên không đi qua phần đo thời gian của HTTP logging interceptor.
 
 Lỗi nghiệp vụ kế thừa `AppError`, khai báo `errorCode` và `httpStatus`. Exception filter sử dụng các thuộc tính này để tạo HTTP response.
+
+### 5.2. Bảo mật được kiểm tra ở đâu?
+
+| Điểm kiểm tra | Câu hỏi cần trả lời | Cách thực hiện hiện tại |
+| --- | --- | --- |
+| Xác thực — guard | Người gọi là ai? | Đọc Bearer JWT, xác minh bằng `TokenServicePort`, gắn payload vào `request.user`; thiếu/sai/hết hạn token trả `401` |
+| Kiểm tra đầu vào — pipe và DTO | Dữ liệu có đúng cấu trúc và ràng buộc không? | Kiểm tra body/path/query theo DTO; từ chối field ngoài hợp đồng; controller kiểm tra header cần thiết |
+| Phân quyền — use case | Người gọi có được thao tác tài khoản này không? | So sánh chủ tài khoản với user ID lấy từ JWT đã xác minh |
+| Quy tắc nghiệp vụ — use case và Domain | Thao tác có hợp lệ không? | Kiểm tra trạng thái tài khoản, số tiền, số dư và giới hạn tiền |
+| Nhất quán dữ liệu — use case và adapter | Cập nhật đồng thời hoặc gửi lại có làm sai dữ liệu không? | Transaction, row lock, idempotency và constraint DB; chi tiết ở mục 6–7 |
+
+**Xác thực không thay thế phân quyền.** User A có JWT hợp lệ sẽ qua guard, nhưng không được chuyển tiền từ tài khoản của user B. `TransfersController` lấy `initiatedByUserId` từ `user.sub`, không nhận danh tính này tùy ý từ body. `TransferMoneyUseCase` kiểm tra chủ tài khoản nguồn trước khi trả kết quả replay hoặc thực hiện chuyển mới. Nguồn không tồn tại hoặc không thuộc người gọi đều trả `404`.
+
+Các cơ chế transaction, row lock và idempotency bảo vệ tính đúng đắn của giao dịch; chúng không thay thế kiểm tra JWT và quyền sở hữu. Khi thử lại chuyển tiền, client cần gửi cùng key và payload; hiện tại use case chưa đối chiếu toàn bộ payload với giao dịch cũ khi tìm thấy cùng key.
+
+### 5.3. Luồng đăng nhập: bcrypt và JWT nằm ở đâu?
+
+```mermaid
+flowchart TD
+    Client["Client gửi email và mật khẩu"] --> Guard["Guard nhận biết @Public(): không yêu cầu JWT"]
+    Guard --> Pipe["ValidationPipe kiểm tra LoginDto"]
+    Pipe --> Controller["AuthController"]
+    Controller --> UseCase["LoginUseCase: chuẩn hóa email"]
+    UseCase --> Repo["UserRepositoryPort → PrismaUserRepository: tìm user"]
+    Repo --> Bcrypt["PasswordHasherPort → BcryptPasswordHasher: so sánh mật khẩu"]
+    Bcrypt --> Valid{"User tồn tại và mật khẩu đúng?"}
+    Valid -->|Không| Error["InvalidCredentialsError → Exception Filter → Client"]
+    Valid -->|Có| JWT["TokenServicePort → JwtTokenService: tạo access token"]
+    JWT --> Response["Trả JWT và thông tin user an toàn về Client"]
+```
+
+Sơ đồ đăng nhập lược bỏ middleware và interceptor đã mô tả ở mục 5.1. Khi email không tồn tại, use case vẫn so sánh mật khẩu với một hash giả để giảm khác biệt thời gian xử lý; email không tồn tại và mật khẩu sai cùng trả một loại lỗi đăng nhập.
+
+Bcrypt băm mật khẩu khi đăng ký và kiểm tra mật khẩu khi đăng nhập. Các request được bảo vệ sau đó dùng JWT, không chạy bcrypt lại trên mỗi request. Client gửi `Authorization: Bearer <accessToken>`; guard xác minh token trước khi controller được thực thi.
+
+### 5.4. Mã nguồn để đối chiếu
+
+- [main.ts](../../src/main.ts): đăng ký middleware, interceptor, validation pipe và exception filter.
+- [AppModule](../../src/app.module.ts): đăng ký `AccessTokenGuard` toàn cục bằng `APP_GUARD`.
+- [AccessTokenGuard](../../src/common/security/guards/access-token.guard.ts): xác thực JWT và xử lý route public.
+- [ValidationPipe](../../src/common/http/pipes/validation-pipe.factory.ts): cấu hình kiểm tra đầu vào.
+- [TransfersController](../../src/modules/money-movement/presentation/http/transfers.controller.ts) và [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts): lấy danh tính, kiểm tra quyền và điều phối chuyển tiền.
+- [LoginUseCase](../../src/modules/identity/application/use-cases/login.use-case.ts): kiểm tra mật khẩu qua port và yêu cầu tạo JWT.
+- [BcryptPasswordHasher](../../src/modules/identity/infrastructure/security/bcrypt-password-hasher.ts) và [JwtTokenService](../../src/modules/identity/infrastructure/security/jwt-token.service.ts): adapter bảo mật.
 
 ## 6. Luồng chuyển khoản
 

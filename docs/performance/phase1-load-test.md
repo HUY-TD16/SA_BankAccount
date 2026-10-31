@@ -1,6 +1,6 @@
 **Kiểm thử tải Pha 1 — Bank Account**
 
-Kiểm thử được chạy trên Kaggle CPU ngày **28/10/2026 (UTC)**, gồm đăng nhập, xem tài khoản và rút tiền đồng thời. Mục tiêu là đo thời gian phản hồi, số request xử lý được và kiểm tra số dư sau tải.
+Kiểm thử được chạy trên Kaggle CPU ngày **28/10/2026 (UTC)**, gồm đăng nhập, xem tài khoản và rút tiền đồng thời. Mục tiêu là đo thời gian phản hồi, số request xử lý được và kiểm tra số dư sau tải. Ngày **31/10/2026 (UTC)**, nhóm đo bổ sung riêng login để tìm điểm bão hòa, trình bày ở mục 7.
 
 **1. Môi trường và dữ liệu**
 
@@ -64,8 +64,41 @@ Bài riêng chống rút quá số dư cũng đạt: 20 request cùng rút 10.00
 - **Rút tiền:** số dư vẫn đúng nhưng phản hồi chậm hơn khi nhiều client cùng thao tác một tài khoản. Ở 20 VU, throughput ba lượt dao động **96,85–113,98 request/giây**, p99 tổng hợp khoảng 582,51 ms.
 - Ngưỡng error rate dưới 1% đã đạt. Chưa đặt ngưỡng latency, nên chưa kết luận hệ thống đạt mọi yêu cầu hiệu năng.
 
+**7. Đo bổ sung tìm trần login — 31/10/2026 (UTC)**
+
+Nhóm chạy riêng login ở **1, 5, 10, 20, 40 và 80 VU**, mỗi mức lặp **3 lần**, tổng cộng **18 lượt chính thức** và **18 warm-up**. Giữ thời lượng 60 giây/lượt, warm-up 10 giây, nghỉ 100 ms sau mỗi request, timeout 30 giây và graceful stop 35 giây. Cấu hình có ID `sa-bank-phase1-ceiling-login-v1`, được lưu trong `protocol.json` của ZIP mới.
+
+Môi trường ghi nhận: Intel Xeon @ 2.20 GHz, quota 4 CPU, RAM 30 GiB, Node 24.22.0, PostgreSQL 15.19, k6 1.3.0, bcrypt rounds 12 và thread pool 4. Source commit vẫn là `a4a0f831054dc13c3e366952cc960cecd941efe0`; source, lockfile và script k6 trong hai ZIP khớp nhau.
+
+Kết quả có **11.371 request**, **error rate 0%**. Cả 18 lượt chính thức và 18 warm-up đều đạt kiểm tra số dư; bài rút quá số dư riêng cũng đạt. CSV và bảng tổng hợp khớp JSON k6 gốc; CPU/RAM khớp 1.128 mẫu của tiến trình API. RSS API cao nhất trong bộ đo này là **270,08 MiB**.
+
+Bảng dưới lấy median từng chỉ số qua ba lần chạy, cùng cách tổng hợp như mục 4:
+
+| VU | Request/giây | p50 (ms) | p95 (ms) | p99 (ms) | CPU API (%) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 2,56 | 289,06 | 291,04 | 294,81 | 73,13 |
+| 5 | 11,19 | 340,87 | 367,96 | 398,86 | 368,29 |
+| 10 | 11,75 | 743,96 | 886,43 | 923,59 | 391,19 |
+| 20 | 11,75 | 1.591,47 | 1.644,03 | 1.675,63 | 389,72 |
+| 40 | 11,72 | 3.291,83 | 3.356,79 | 3.374,65 | 387,92 |
+| 80 | 11,72 | 6.684,40 | 6.756,30 | 6.787,56 | 390,42 |
+
+Nhận xét:
+
+- Từ 5 lên 10 VU, throughput chỉ tăng khoảng **5%**. Từ 10 lên 80 VU, throughput gần như giữ nguyên ở **11,7–11,8 request/giây**.
+- Trong khi đó, p95 tăng từ **886 ms lên 6.756 ms**, khoảng **7,6 lần**; CPU API duy trì gần hết quota, khoảng **388–391%** ở các mức từ 10 VU.
+- Nhóm nhận định login đã có dấu hiệu bão hòa từ khoảng **10 VU**. Trần throughput quan sát được trong cấu hình và kịch bản này khoảng **11,7–11,8 lượt đăng nhập/giây**; tăng thêm client chủ yếu làm tăng thời gian chờ.
+- Error rate 0% cho thấy request vẫn đạt các điều kiện kiểm tra, nhưng độ trễ ở tải cao tăng mạnh. Chưa đặt ngưỡng latency nên chưa xác định mức tải phục vụ chấp nhận được; số VU cũng không phải số người dùng tối đa của ứng dụng.
+
+Ở 80 VU, thời gian thực tế của mỗi lượt khoảng **66,6–66,7 giây** vì k6 chờ các request đang chạy hoàn tất. Request/giây lấy từ metric k6 theo thời gian thực tế, không chia tổng request cố định cho 60 giây.
+
+Đây là điểm bão hòa quan sát bằng mô hình VU cố định, trong môi trường API, PostgreSQL và k6 cùng chia sẻ tài nguyên Kaggle. Kết quả chỉ áp dụng cho login và cấu hình đã đo.
+
 **File để xem lại**
 
-[ZIP kết quả gốc](bank-test-20261028-163024-full.zip) chứa cấu hình máy, source, script, dữ liệu đầu vào, CSV/JSON, CPU/RAM, log và kiểm tra số dư. Dùng các file **full** cho báo cáo chính thức; các file smoke dùng để kiểm tra nhanh môi trường.
+- [ZIP ba chức năng ngày 28/10](bank-test-20261028-163024-full.zip): 27 lượt chính thức và 27 warm-up. Dùng các file **full** cho báo cáo chính thức; các file smoke dùng để kiểm tra nhanh môi trường.
+- [ZIP tìm trần login ngày 31/10](bank-test-20261031-101416-full.zip): 18 lượt chính thức và 18 warm-up.
+
+Các ZIP lưu cấu hình máy, source, script, dữ liệu đầu vào, CSV/JSON, CPU/RAM, log và kiểm tra số dư. Hai bộ số liệu được trình bày riêng, không gộp để tính lại percentile.
 
 [Script k6](../../test/performance/kaggle-load.js) · [Cấu hình test](../../test/performance/protocol.json)

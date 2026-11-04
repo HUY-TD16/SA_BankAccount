@@ -206,6 +206,25 @@ Mỗi mức tải đo **60 giây/lượt**, làm nóng riêng **10 giây**, lặ
 
 CPU 100% tương đương một CPU logic; login ở 20 VU sử dụng khoảng **3,89 CPU**. RSS của API cao nhất quan sát được là **445,18 MiB**.
 
+### Đo bổ sung tìm trần đăng nhập
+
+Ngày **31/10/2026 (UTC)**, nhóm đo riêng login ở **1, 5, 10, 20, 40 và 80 VU**, mỗi mức lặp **3 lần**, đo 60 giây/lượt và warm-up riêng 10 giây. Bộ đo dùng PostgreSQL **15.19**, quota **4 CPU**, bcrypt rounds **12** và cùng source commit với bộ trên. Tổng **18 lượt chính thức**, **11.371 request**, error rate **0%**; kiểm tra số dư của cả 18 lượt chính thức và 18 warm-up đều đạt.
+
+Bảng lấy median từng chỉ số qua ba lần chạy:
+
+| VU | Request/giây | p50 (ms) | p95 (ms) | p99 (ms) | CPU API (%) |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 2,56 | 289,06 | 291,04 | 294,81 | 73,13 |
+| 5 | 11,19 | 340,87 | 367,96 | 398,86 | 368,29 |
+| 10 | 11,75 | 743,96 | 886,43 | 923,59 | 391,19 |
+| 20 | 11,75 | 1.591,47 | 1.644,03 | 1.675,63 | 389,72 |
+| 40 | 11,72 | 3.291,83 | 3.356,79 | 3.374,65 | 387,92 |
+| 80 | 11,72 | 6.684,40 | 6.756,30 | 6.787,56 | 390,42 |
+
+Từ **10 lên 80 VU**, throughput gần như giữ nguyên, còn p95 tăng từ khoảng **0,89 lên 6,76 giây** và CPU API duy trì gần hết quota. Nhóm nhận định login có dấu hiệu bão hòa từ khoảng **10 VU**, với trần throughput quan sát được khoảng **11,7–11,8 lượt đăng nhập/giây** trong cấu hình và kịch bản này. Chưa đặt ngưỡng latency nên chưa xác định mức tải phục vụ chấp nhận được.
+
+RPS lấy từ thời gian thực tế của k6, gồm thời gian chờ request đang chạy hoàn tất sau khi hết 60 giây. Xem mục 7 trong [báo cáo chi tiết](docs/performance/phase1-load-test.md) và [ZIP tìm trần login](docs/performance/bank-test-20261031-101416-full.zip).
+
 ## 7. Khám phá mã nguồn và tài liệu
 
 ```text

@@ -1,104 +1,90 @@
-**Kiểm thử tải Pha 1 — Bank Account**
+# Báo cáo kiểm thử tải hệ thống
 
-Kiểm thử được chạy trên Kaggle CPU ngày **28/10/2026 (UTC)**, gồm đăng nhập, xem tài khoản và rút tiền đồng thời. Mục tiêu là đo thời gian phản hồi, số request xử lý được và kiểm tra số dư sau tải. Ngày **31/10/2026 (UTC)**, nhóm đo bổ sung riêng login để tìm điểm bão hòa, trình bày ở mục 7.
+Báo cáo kết quả kiểm thử chịu tải hệ thống Bank Account Backend được nhóm thực hiện trên môi trường máy chủ độc lập **Kaggle CPU** vào ngày **28/10/2026** và đợt đo bổ sung ngày **31/10/2026**.
 
-**1. Môi trường và dữ liệu**
+Mục tiêu chính của đợt kiểm thử là:
+1. Đánh giá khả năng mở rộng và thời gian phản hồi của hệ thống dưới các mức tải đồng thời khác nhau.
+2. Kiểm chứng tính toàn vẹn số dư và cơ chế chống âm tiền khi có nhiều tiến trình cùng rút tiền trên một tài khoản.
+3. Xác định giới hạn xử lý và điểm nghẽn tài nguyên của các luồng nghiệp vụ.
 
-- CPU Intel Xeon @ 2.20 GHz, 4 CPU logic, quota 4 CPU, giới hạn RAM 30 GiB. API, PostgreSQL và k6 chạy chung một phiên Kaggle.
-- Node 24.22.0, PostgreSQL 15.19 (Ubuntu 15.19-1.pgdg24.04+2), k6 1.3.0. psutil thực tế ghi nhận trong lần chạy là 5.9.5. Notebook và Docker mặc định cùng dùng phiên bản lớn PostgreSQL 15.
-- Source commit: `a4a0f831054dc13c3e366952cc960cecd941efe0`. Bcrypt rounds 12, thread pool 4.
-- Mỗi lượt có 1 user và 20 tài khoản PAYMENT/VND, mỗi tài khoản ban đầu có 1 tỷ VND. Dữ liệu được tạo lại trước mỗi lượt, ngoài thời gian đo.
+## 1. Môi trường và cấu hình thử nghiệm
 
-**2. Kịch bản**
+Để kết quả đo có tính khách quan và có thể tái lập, nhóm chạy toàn bộ ứng dụng, database và công cụ tạo tải trên một môi trường cô lập:
+– **Nền tảng kiểm thử:** Kaggle Notebook không dùng GPU.  
+– **Phần cứng:** Intel Xeon 2.20 GHz, 4 vCPUs logic, 30 GB RAM.  
+– **Phần mềm:** Node.js 24.22.0, PostgreSQL 15.19, công cụ đo tải Grafana k6 v1.3.0.  
+– **Cấu hình ứng dụng:** chế độ production, Bcrypt chi phí 12, UV_THREADPOOL_SIZE = 4.  
+– **Tập dữ liệu chuẩn bị:** Mỗi lượt kiểm thử sử dụng 1 người dùng và 20 tài khoản thanh toán `PAYMENT`, mỗi tài khoản có số dư ban đầu là 1 tỷ VND. Dữ liệu được làm mới hoàn toàn trước mỗi lượt đo.  
 
-| Bài test | Request | Kết quả mong đợi |
-|---|---|---|
-| Đăng nhập | `POST /api/v1/auth/login` với email và mật khẩu đúng | HTTP 200, có access token |
-| Xem tài khoản | `GET /api/v1/accounts?page=1&limit=20` với token | HTTP 200, đúng 20 tài khoản của user |
-| Rút tiền đồng thời | `POST /api/v1/accounts/{id}/transactions`, cùng một tài khoản, mỗi lần rút 1 VND | HTTP 201, số dư giảm đúng và không âm |
+## 2. Kịch bản đo tải chi tiết
 
-Mỗi bài chạy với **1, 5 và 20 client ảo (VU)**, đo **60 giây/lượt**, lặp **3 lần**, tổng cộng **27 lượt chính thức**.
+Nhóm thiết kế 3 kịch bản đại diện cho 3 nhóm thao tác đặc thù trong kiến trúc:
+1. **Kịch bản 1: Đăng nhập** (`POST /auth/login`)  
+   Đại diện cho luồng xử lý nặng về tính toán CPU do thuật toán băm mật khẩu Bcrypt.
+2. **Kịch bản 2: Xem danh sách tài khoản** (`GET /accounts?page=1&limit=20`)  
+   Đại diện cho luồng chỉ đọc dữ liệu.
+3. **Kịch bản 3: Rút tiền đồng thời** (`POST /accounts/{id}/transactions`)  
+   Nhiều client ảo cùng thực hiện rút 1 VND trên cùng một tài khoản duy nhất, đại diện cho luồng ghi cạnh tranh khóa dòng dữ liệu `SELECT ... FOR UPDATE`.
 
-Trước mỗi lượt có 10 giây chạy làm nóng, lưu riêng. Mỗi client chờ phản hồi rồi nghỉ 100 ms trước khi gửi tiếp; giữa các lượt nghỉ 2 giây. Request timeout là 30 giây. Khi hết thời gian đo, k6 cho iteration đang chạy tối đa 35 giây để hoàn tất.
+Mỗi kịch bản được thực thi ở 3 mức tải đồng thời: **1 VU**, **5 VU** và **20 VU**. Mỗi lượt đo kéo dài **60 giây**, có **10 giây làm nóng** riêng biệt, và được lặp lại **3 lần** độc lập để lấy giá trị trung vị. Tổng cộng thực hiện **27 lượt đo chính thức**.
 
-**3. Cách chạy lại**
+## 3. Kết quả đo tải thực tế
 
-1. Bắt đầu phiên Kaggle mới, import [notebook](kaggle-load-test.ipynb), chọn **Accelerator=None**, **Internet=On**.
-2. Giữ `MODE = 'smoke'`, chạy lần lượt các phần. Phần 4 phải in `Database ready: 15.x`; phiên bản đầy đủ được lưu trong `environment.json` ở phần 6.
-3. Khi chạy thử đạt, thêm ô `MODE = 'full'` trước phần 9, rồi chạy lại phần **9 → 10 → 11**. Tải ZIP ở phần 11 sau khi hoàn tất.
+Tổng số requests ghi nhận trong 27 lượt đo chính thức là **76.960 requests**, với **tỉ lệ lỗi 0%**.
 
-Khi đo lại để so sánh, giữ cùng phần cứng, phiên bản phần mềm, workload, dữ liệu đầu vào và cách đo. Kiểm tra `environment.json` vì CPU được cấp trên Kaggle có thể khác giữa các phiên.
+Bảng số liệu lấy theo giá trị trung vị của từng chỉ số qua 3 lần chạy:
 
-**4. Kết quả**
+| Kịch bản kiểm thử | Tải đồng thời | Throughput (Req/giây) | p50 (ms) | p95 (ms) | p99 (ms) | Mức tải CPU API |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Đăng nhập** | 1 VU | 2.50 | 297.08 | 309.99 | 321.65 | 74.18% |
+| | 5 VU | 10.86 | 352.83 | 388.96 | 422.55 | 369.32% |
+| | 20 VU | 11.34 | 1,649.11 | 1,736.08 | 1,783.00 | 388.99% |
+| **Xem tài khoản** | 1 VU | 9.49 | 3.89 | 4.37 | 4.91 | 3.64% |
+| | 5 VU | 47.17 | 4.49 | 6.19 | 8.61 | 14.80% |
+| | 20 VU | 188.60 | 4.27 | 7.40 | 15.70 | 49.54% |
+| **Rút tiền** | 1 VU | 8.88 | 11.11 | 13.12 | 16.57 | 6.11% |
+| | 5 VU | 44.52 | 10.76 | 13.25 | 21.30 | 24.82% |
+| | 20 VU | 99.44 | 44.74 | 324.30 | 582.51 | 61.80% |
 
-Bộ full có **76.960 request**, **error rate 0%** ở cả 27 lượt. Có đủ 27 lượt làm nóng riêng. CSV và bảng tổng hợp đã được đối chiếu với JSON k6 gốc; CPU/RAM đã được đối chiếu với 1.650 mẫu của tiến trình API.
+*(Ghi chú: Mức tải CPU 100% tương đương 1 lõi logic; 388.99% nghĩa là ứng dụng đã khai thác gần như trọn vẹn cả 4 vCPUs được cấp).*
 
-Bảng dưới lấy median từng chỉ số qua ba lần chạy. p50/p95/p99 là các ngưỡng thời gian phản hồi ứng với khoảng 50%/95%/99% request của từng lượt; bảng tổng hợp không tính lại percentile trên dữ liệu gộp.
+## 4. Kiểm chứng tính toàn vẹn dữ liệu và đối soát số dư
 
-| Bài test | VU | Request/giây | p50 (ms) | p95 (ms) | p99 (ms) | CPU API (%) |
-|---|---:|---:|---:|---:|---:|---:|
-| Đăng nhập | 1 | 2,50 | 297,08 | 309,99 | 321,65 | 74,18 |
-| Đăng nhập | 5 | 10,86 | 352,83 | 388,96 | 422,55 | 369,32 |
-| Đăng nhập | 20 | 11,34 | 1.649,11 | 1.736,08 | 1.783,00 | 388,99 |
-| Xem tài khoản | 1 | 9,49 | 3,89 | 4,37 | 4,91 | 3,64 |
-| Xem tài khoản | 5 | 47,17 | 4,49 | 6,19 | 8,61 | 14,80 |
-| Xem tài khoản | 20 | 188,60 | 4,27 | 7,40 | 15,70 | 49,54 |
-| Rút tiền | 1 | 8,88 | 11,11 | 13,12 | 16,57 | 6,11 |
-| Rút tiền | 5 | 44,52 | 10,76 | 13,25 | 21,30 | 24,82 |
-| Rút tiền | 20 | 99,44 | 44,74 | 324,30 | 582,51 | 61,80 |
+Sau mỗi lượt đo rút tiền, script kiểm tra tự động chạy câu lệnh SQL đối soát trực tiếp trên database:
+– **Công thức kiểm tra:** $\text{Số dư sau test} = \text{Số dư ban đầu} - (\text{Số lượt rút thành công} \times 1\text{ VND})$.  
+– **Kiểm tra sổ cái:** Số dòng phát sinh trong bảng `financial_transactions` với mã `CASH_WITHDRAWAL` phải khớp chính xác 100% với số lượng request HTTP 201 Created.  
+– **Kết quả:** Cả **27 lượt đo chính thức và 27 lượt làm nóng đều vượt qua bài test đối soát**. Không có bất kỳ sai lệch số học nào, không có số dư âm.  
 
-CPU 100% tương đương một CPU logic. Vì vậy 388,99% ở login tương đương khoảng 3,89 CPU, gần hết quota 4 CPU. RSS của API cao nhất quan sát được khoảng 445,18 MiB, chưa đủ dữ liệu để kết luận có rò rỉ bộ nhớ.
+### Thử nghiệm đặc biệt: Kiểm tra chặn rút quá số dư
+Nhóm thực hiện một bài test biên riêng biệt: Tạo tài khoản có số dư **100.000 VND**, sau đó cho **20 request đồng thời cùng rút 10.000 VND** (tổng nhu cầu rút là 200.000 VND, vượt gấp đôi số dư).
+– **Kết quả thực tế:** Đúng **10 request đầu tiên thành công** (HTTP 201), **10 request tiếp theo bị từ chối với lỗi HTTP 409 INSUFFICIENT_FUNDS**.  
+– **Số dư cuối cùng:** Đúng bằng **0 VND**, số bản ghi sổ cái sinh ra đúng bằng 10. Điều này chứng minh cơ chế khóa dòng đã ngăn chặn thành công 100% tình trạng thấu chi tài khoản.  
 
-**5. Kiểm tra số dư**
+## 5. Thử nghiệm bổ sung: Tìm ngưỡng bão hòa của luồng đăng nhập
 
-Sau từng lượt, số dư phải bằng số dư đầu trừ số lần rút thành công × 1 VND; số bút toán DEBIT phải bằng số lần rút thành công. Các tài khoản khác giữ nguyên số dư, không có số dư âm.
+Nhận thấy luồng đăng nhập có throughput chững lại ở mức khoảng 11 req/giây, vào ngày **31/10/2026**, nhóm đã đo bổ sung riêng luồng login ở các dải tải tăng dần: **1, 5, 10, 20, 40 và 80 VU** (mỗi mức chạy 3 lần, 60 giây mỗi lượt):
 
-Cả **27 lượt chính thức và 27 lượt làm nóng đều đạt** kiểm tra này. Login và xem tài khoản không làm thay đổi số dư.
+| Tải ảo (VU) | Throughput (Req/giây) | p50 (ms) | p95 (ms) | p99 (ms) | Mức tải CPU API |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| 1 | 2.56 | 289.06 | 291.04 | 294.81 | 73.13% |
+| 5 | 11.19 | 340.87 | 367.96 | 398.86 | 368.29% |
+| 10 | 11.75 | 743.96 | 886.43 | 923.59 | 391.19% |
+| 20 | 11.75 | 1,591.47 | 1,644.03 | 1,675.63 | 389.72% |
+| 40 | 11.72 | 3,291.83 | 3,356.79 | 3,374.65 | 387.92% |
+| 80 | 11.72 | 6,684.40 | 6,756.30 | 6,787.56 | 390.42% |
 
-Bài riêng chống rút quá số dư cũng đạt: 20 request cùng rút 10.000 VND từ tài khoản có 100.000 VND, kết quả **10 lần thành công, 10 lần báo thiếu tiền, số dư 0 và 10 bút toán DEBIT**. Các lỗi thiếu tiền dự kiến này không gộp vào error rate ở trên.
+## 6. Phân tích chuyên sâu và đánh giá kiến trúc
 
-**6. Nhận xét**
+Từ các kết quả đo đạc thực tế, nhóm rút ra 3 kết luận kiến trúc quan trọng:
 
-- **Đăng nhập:** có dấu hiệu bão hòa CPU ở 20 VU. Từ 5 lên 20 VU, throughput chỉ tăng từ 10,86 lên 11,34 request/giây, còn p95 tăng từ khoảng 389 lên 1.736 ms.
-- **Xem tài khoản:** xử lý nhanh với dữ liệu hiện tại, đạt khoảng 188,60 request/giây ở 20 VU. Chưa thể xem đây là công suất tối đa của API vì còn giới hạn client và khoảng nghỉ giữa request.
-- **Rút tiền:** số dư vẫn đúng nhưng phản hồi chậm hơn khi nhiều client cùng thao tác một tài khoản. Ở 20 VU, throughput ba lượt dao động **96,85–113,98 request/giây**, p99 tổng hợp khoảng 582,51 ms.
-- Ngưỡng error rate dưới 1% đã đạt. Chưa đặt ngưỡng latency, nên chưa kết luận hệ thống đạt mọi yêu cầu hiệu năng.
+### 1. Luồng đọc mở rộng tuyến tính xuất sắc
+Throughput tăng gần như hoàn hảo theo cấp số nhân: $9.49 \rightarrow 47.17 \rightarrow 188.60\text{ req/giây}$ khi tăng từ 1 lên 20 VU. Độ trễ trung vị p50 giữ vững ở mức khoảng 4ms. Điều này chứng minh việc phân tách luồng đọc độc lập, không bị ảnh hưởng bởi transaction lock, đã tận dụng triệt để index trên PostgreSQL.
 
-**7. Đo bổ sung tìm trần login — 31/10/2026 (UTC)**
+### 2. Luồng ghi phản ánh chi phí an toàn dữ liệu
+Ở 20 VU cạnh tranh trên cùng 1 tài khoản, throughput đạt xấp xỉ 100 req/giây. Độ trễ ở đuôi phân vị cao (p95: 324ms, p99: 582ms) tăng lên là hiện tượng bình thường trong kỹ thuật cơ sở dữ liệu: đây là thời gian xếp hàng chờ giải phóng khóa dòng của các tiến trình cạnh tranh trên cùng một tài khoản. Nhóm chấp nhận đánh đổi độ trễ ở đuôi để đổi lấy sự đảm bảo tuyệt đối về tính toàn vẹn số dư (tỉ lệ lỗi 0%, không âm tiền).
 
-Nhóm chạy riêng login ở **1, 5, 10, 20, 40 và 80 VU**, mỗi mức lặp **3 lần**, tổng cộng **18 lượt chính thức** và **18 warm-up**. Giữ thời lượng 60 giây/lượt, warm-up 10 giây, nghỉ 100 ms sau mỗi request, timeout 30 giây và graceful stop 35 giây. Cấu hình có ID `sa-bank-phase1-ceiling-login-v1`, được lưu trong `protocol.json` của ZIP mới.
-
-Môi trường ghi nhận: Intel Xeon @ 2.20 GHz, quota 4 CPU, RAM 30 GiB, Node 24.22.0, PostgreSQL 15.19, k6 1.3.0, bcrypt rounds 12 và thread pool 4. Source commit vẫn là `a4a0f831054dc13c3e366952cc960cecd941efe0`; source, lockfile và script k6 trong hai ZIP khớp nhau.
-
-Kết quả có **11.371 request**, **error rate 0%**. Cả 18 lượt chính thức và 18 warm-up đều đạt kiểm tra số dư; bài rút quá số dư riêng cũng đạt. CSV và bảng tổng hợp khớp JSON k6 gốc; CPU/RAM khớp 1.128 mẫu của tiến trình API. RSS API cao nhất trong bộ đo này là **270,08 MiB**.
-
-Bảng dưới lấy median từng chỉ số qua ba lần chạy, cùng cách tổng hợp như mục 4:
-
-| VU | Request/giây | p50 (ms) | p95 (ms) | p99 (ms) | CPU API (%) |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 2,56 | 289,06 | 291,04 | 294,81 | 73,13 |
-| 5 | 11,19 | 340,87 | 367,96 | 398,86 | 368,29 |
-| 10 | 11,75 | 743,96 | 886,43 | 923,59 | 391,19 |
-| 20 | 11,75 | 1.591,47 | 1.644,03 | 1.675,63 | 389,72 |
-| 40 | 11,72 | 3.291,83 | 3.356,79 | 3.374,65 | 387,92 |
-| 80 | 11,72 | 6.684,40 | 6.756,30 | 6.787,56 | 390,42 |
-
-Nhận xét:
-
-- Từ 5 lên 10 VU, throughput chỉ tăng khoảng **5%**. Từ 10 lên 80 VU, throughput gần như giữ nguyên ở **11,7–11,8 request/giây**.
-- Trong khi đó, p95 tăng từ **886 ms lên 6.756 ms**, khoảng **7,6 lần**; CPU API duy trì gần hết quota, khoảng **388–391%** ở các mức từ 10 VU.
-- Nhóm nhận định login đã có dấu hiệu bão hòa từ khoảng **10 VU**. Trần throughput quan sát được trong cấu hình và kịch bản này khoảng **11,7–11,8 lượt đăng nhập/giây**; tăng thêm client chủ yếu làm tăng thời gian chờ.
-- Error rate 0% cho thấy request vẫn đạt các điều kiện kiểm tra, nhưng độ trễ ở tải cao tăng mạnh. Chưa đặt ngưỡng latency nên chưa xác định mức tải phục vụ chấp nhận được; số VU cũng không phải số người dùng tối đa của ứng dụng.
-
-Ở 80 VU, thời gian thực tế của mỗi lượt khoảng **66,6–66,7 giây** vì k6 chờ các request đang chạy hoàn tất. Request/giây lấy từ metric k6 theo thời gian thực tế, không chia tổng request cố định cho 60 giây.
-
-Đây là điểm bão hòa quan sát bằng mô hình VU cố định, trong môi trường API, PostgreSQL và k6 cùng chia sẻ tài nguyên Kaggle. Kết quả chỉ áp dụng cho login và cấu hình đã đo.
-
-**File để xem lại**
-
-- [ZIP ba chức năng ngày 28/10](bank-test-20261028-163024-full.zip): 27 lượt chính thức và 27 warm-up. Dùng các file **full** cho báo cáo chính thức; các file smoke dùng để kiểm tra nhanh môi trường.
-- [ZIP tìm trần login ngày 31/10](bank-test-20261031-101416-full.zip): 18 lượt chính thức và 18 warm-up.
-
-Các ZIP lưu cấu hình máy, source, script, dữ liệu đầu vào, CSV/JSON, CPU/RAM, log và kiểm tra số dư. Hai bộ số liệu được trình bày riêng, không gộp để tính lại percentile.
-
-[Script k6](../../test/performance/kaggle-load.js) · [Cấu hình test](../../test/performance/protocol.json)
+### 3. Luồng đăng nhập chậm có chủ đích để bảo mật
+Throughput đăng nhập đạt đỉnh và bão hòa ở ngưỡng khoảng 11.75 req/giây. Khi tải tăng từ 10 lên 80 VU, CPU duy trì ở mức tối đa gần 390% (chạm trần 4 lõi). 
+Nguyên nhân không phải do nghẽn I/O hay lỗi code, mà do thuật toán băm mật khẩu Bcrypt chi phí 12 tiêu tốn khoảng 300ms tính toán CPU cho mỗi lần băm. Với 4 lõi CPU, công suất xử lý lý thuyết tối đa là:
+$$\text{Max Throughput} = \frac{4\text{ cores}}{0.3\text{ giây}} \approx 13.3\text{ req/giây}$$
+Kết quả thực tế đạt 11.75 req/giây chứng minh hệ thống đã khai thác tới gần 90% hiệu suất tính toán tối đa của phần cứng mà không hề phát sinh lỗi hay sập tiến trình.

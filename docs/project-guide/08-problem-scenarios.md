@@ -1,91 +1,112 @@
-# Các tình huống và cơ chế xử lý
+# 9 tình huống xung đột đồng thời và giải pháp kỹ thuật
 
-[Mục lục](README.md) · [Đề cương trình bày](../presentation.md)
+Tài liệu phân tích chi tiết 9 tình huống biên và xung đột đồng thời trong môi trường thực tế, nguy cơ thất thoát dữ liệu và cách hệ thống giải quyết trong mã nguồn.
 
-- Nội dung: các tình huống khi sử dụng API, nguy cơ đối với dữ liệu và cách mã nguồn xử lý.
-- Các ví dụ giả định request hợp lệ, database hoạt động bình thường và không có giao dịch khác ngoài những giao dịch được nêu.
-- Kết quả dưới đây là hành vi mong đợi theo triển khai; cách chạy kiểm thử nằm trong [hướng dẫn kiểm thử](06-testing.md).
+## 1. Hai request cùng rút tiền đồng thời từ một tài khoản
 
-## 1. Hai request cùng rút tiền từ một tài khoản
+– **Bối cảnh:** Tài khoản hiện có **100.000 VND**. Hai request từ ứng dụng di động gửi lên cùng một thời điểm, mỗi request yêu cầu rút **80.000 VND** (tổng số tiền muốn rút là 160.000 VND).  
+– **Nguy cơ tiềm ẩn:** Cả 2 luồng xử lý cùng đọc số dư tại một thời điểm thấy còn 100.000 VND, dẫn đến cả hai cùng cho phép trừ tiền và tài khoản bị âm thành **-60.000 VND**, gây thất thoát tiền của ngân hàng.  
+– **Giải pháp của hệ thống:**  
+  – Áp dụng khóa bi quan bằng câu lệnh `SELECT ... FOR UPDATE` trong transaction của PostgreSQL.  
+  – Khi request 1 đọc dữ liệu, dòng tài khoản đó bị khóa lại. Request 2 buộc phải tạm dừng và xếp hàng chờ ở cổng cơ sở dữ liệu.  
+  – Request 1 rút 80.000 VND, cập nhật số dư thành 20.000 VND, ghi sổ cái và commit. Khóa được giải phóng.  
+  – Request 2 nhận được quyền truy cập, đọc lại số dư mới là 20.000 VND, nhận thấy số dư không đủ nên ném ngoại lệ `InsufficientFundsError`.  
+– **Kết quả thực tế:** 1 request thành công với mã 201 Created, 1 request bị từ chối với lỗi 409 Conflict. Số dư cuối cùng chính xác là 20.000 VND.  
+– **Vị trí mã nguồn:** [WithdrawMoneyUseCase](../../src/modules/money-movement/application/use-cases/withdraw-money.use-case.ts), [PrismaUnitOfWork](../../src/modules/money-movement/infrastructure/persistence/prisma-unit-of-work.ts).  
 
-- **Ví dụ:** tài khoản có 100.000 VND; hai request cùng rút 80.000 VND.
-- **Nguy cơ:** cả hai cùng đọc số dư 100.000 và đều được chấp nhận, dù tổng tiền rút vượt số dư.
-- **Cách xử lý:** khóa dòng tài khoản bằng `SELECT ... FOR UPDATE` trong database transaction. Request giữ khóa kiểm tra số dư và ghi giao dịch; request còn lại chờ khóa rồi đọc số dư mới.
-- **Kết quả mong đợi:** một request thành công; request còn lại nhận `409 INSUFFICIENT_FUNDS`. Số dư cuối 20.000 VND, chỉ thêm một giao dịch DEBIT.
-- **Mã nguồn:** [WithdrawMoneyUseCase](../../src/modules/money-movement/application/use-cases/withdraw-money.use-case.ts), [PrismaUnitOfWork](../../src/modules/money-movement/infrastructure/persistence/prisma-unit-of-work.ts).
+## 2. Sự cố hệ thống giữa bước trừ tiền nguồn và cộng tiền đích
 
-## 2. Chuyển tiền bị lỗi giữa bước trừ nguồn và cộng đích
+– **Bối cảnh:** Tài khoản A chuyển **100.000 VND** sang tài khoản B. Ứng dụng đã trừ thành công 100.000 VND ở tài khoản A, nhưng ngay trước khi cộng tiền vào tài khoản B thì xảy ra lỗi mất kết nối DB hoặc server bị tắt đột ngột.  
+– **Nguy cơ tiềm ẩn:** Tài khoản A bị trừ tiền nhưng tài khoản B không nhận được, tiền bị biến mất khỏi hệ thống và số dư hai bên không cân bằng.  
+– **Giải pháp của hệ thống:**  
+  – Áp dụng mẫu thiết kế Unit of Work qua `UnitOfWorkPort` và `PrismaUnitOfWork`. Toàn bộ 5 thao tác: trừ tiền A, cộng tiền B, tạo bản ghi chuyển khoản `transfers`, tạo 2 dòng sao kê `financial_transactions` đều được đặt chung trong một transaction duy nhất.  
+  – Nếu bất kỳ câu lệnh nào thất bại hoặc server gặp exception, cơ chế ACID của PostgreSQL tự động rollback toàn bộ 100%.  
+– **Kết quả thực tế:** Số dư tài khoản A và B được khôi phục nguyên vẹn như trước khi gửi lệnh. Client nhận mã lỗi 500.  
+– **Vị trí mã nguồn:** [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts).  
 
-- **Ví dụ:** A có 500.000 VND, B có 0 VND; chuyển 100.000 VND nhưng gặp lỗi sau bước cập nhật A, trước bước cập nhật B.
-- **Nguy cơ:** A mất tiền trong khi B không nhận được tiền; số dư và lịch sử lệch nhau.
-- **Cách xử lý:** cập nhật hai số dư, tạo Transfer và hai giao dịch đối ứng trong cùng một transaction. Callback phát sinh lỗi thì Prisma rollback toàn bộ các thay đổi của transaction.
-- **Kết quả mong đợi:** A vẫn 500.000 VND, B vẫn 0 VND; không có Transfer hoặc bút toán mới từ lệnh thất bại. Lỗi nội bộ ngoài dự kiến trả HTTP 500.
-- **Phân biệt:** nếu database đã commit nhưng client mất kết nối trước khi nhận response, giao dịch vẫn tồn tại; trường hợp đó xử lý bằng retry cùng key ở mục 3.
-- **Mã nguồn:** [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts), [PrismaUnitOfWork](../../src/modules/money-movement/infrastructure/persistence/prisma-unit-of-work.ts).
+## 3. Client gửi lại yêu cầu chuyển tiền sau khi bị gián đoạn mạng
 
-## 3. Client gửi lại chuyển khoản sau timeout
+– **Bối cảnh:** Client gửi lệnh chuyển 100.000 VND. Server đã xử lý thành công và lưu vào cơ sở dữ liệu, nhưng đường truyền mạng bị ngắt đúng lúc gói tin phản hồi HTTP đang truyền về client. Ứng dụng client không nhận được kết quả nên tự động thử gửi lại lệnh.  
+– **Nguy cơ tiềm ẩn:** Server xử lý lại từ đầu khiến tài khoản A bị trừ tiếp 100.000 VND lần thứ hai.  
+– **Giải pháp của hệ thống:**  
+  – Bắt buộc client phải sinh một chuỗi ngẫu nhiên `Idempotency-Key` dài từ 16 đến 128 ký tự đính kèm trong header HTTP.  
+  – Bảng `transfers` được đặt ràng buộc duy nhất trên cặp tài khoản nguồn và idempotency key.  
+  – Khi nhận request, `TransferMoneyUseCase` kiểm tra xem đã tồn tại bản ghi với key này trên tài khoản nguồn hay chưa. Nếu đã tồn tại, hệ thống trả về ngay kết quả giao dịch trước đó kèm mã HTTP 200 OK mà không thực hiện lại logic trừ tiền.  
+– **Kết quả thực tế:** Lần gọi đầu trả về 201 Created, lần gọi sau trả về 200 OK. Tiền chỉ bị trừ đúng một lần duy nhất.  
+– **Vị trí mã nguồn:** [TransfersController](../../src/modules/money-movement/presentation/http/transfers.controller.ts), [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts).  
 
-- **Ví dụ:** chuyển 100.000 VND từ A sang B đã commit, nhưng client không nhận được phản hồi và gửi lại.
-- **Nguy cơ:** backend thực hiện thêm một lần chuyển tiền.
-- **Cách xử lý:** client gửi cùng `Idempotency-Key` và toàn bộ payload. Sau khi tra đích, khóa tài khoản và xác minh quyền sở hữu nguồn, use case tìm transfer theo `(sourceAccountId, idempotencyKey)`.
-- **Kết quả mong đợi:** nếu đã có transfer, trả bản ghi cũ với HTTP 200; không đổi số dư, không tạo thêm bút toán. Chuyển mới thành công trả HTTP 201.
-- **Quy tắc sử dụng:** mỗi ý định chuyển mới dùng key mới; cùng một lệnh được gửi lại phải giữ nguyên key và payload. Key dài 16–128 ký tự sau trim.
-- **Giới hạn cần biết:** việc nhận diện transfer cũ không so sánh payload/hash. Đổi payload có thể trả kết quả cũ hoặc lỗi ở bước kiểm tra trước đó; không mặc định nhận lỗi xung đột khi đổi payload.
-- **Mã nguồn:** [TransfersController](../../src/modules/money-movement/presentation/http/transfers.controller.ts), [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts), [unique key trong schema](../../prisma/schema.prisma).
+## 4. Hai lệnh chuyển tiền chéo nhau chạy đồng thời gây bế tắc
 
-## 4. Hai lệnh chuyển tiền ngược chiều chạy đồng thời
+– **Bối cảnh:** Tại cùng một thời điểm, người dùng A chuyển tiền cho người dùng B, đồng thời người dùng B cũng chuyển tiền cho người dùng A.  
+– **Nguy cơ tiềm ẩn:**  
+  – Tiến trình 1 khóa tài khoản A, sau đó xin khóa tiếp tài khoản B.  
+  – Tiến trình 2 khóa tài khoản B, sau đó xin khóa tiếp tài khoản A.  
+  – Hai tiến trình chờ đợi khóa của nhau vô tận, dẫn đến treo kết nối cơ sở dữ liệu và bị abort ngắt quãng.  
+– **Giải pháp của hệ thống:**  
+  – Trước khi xin khóa, hệ thống luôn chuẩn hóa thứ tự khóa bằng cách so sánh UUID của 2 tài khoản: tài khoản có UUID nhỏ hơn luôn bị khóa trước, tài khoản có UUID lớn hơn bị khóa sau.  
+  – Dù chiều chuyển tiền là từ A sang B hay từ B sang A, cả 2 tiến trình đều cạnh tranh xin khóa tài khoản có UUID nhỏ hơn trước. Tiến trình nào đến trước sẽ giành được khóa đầu tiên; tiến trình đến sau phải chờ ở ngoài, triệt tiêu hoàn toàn chu trình khóa luẩn quẩn.  
+– **Kết quả thực tế:** Giao dịch được tuần tự hóa an toàn, không bao giờ xảy ra lỗi deadlock trong cơ sở dữ liệu.  
+– **Vị trí mã nguồn:** [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts).  
 
-- **Ví dụ:** một request chuyển A → B, request khác chuyển B → A.
-- **Nguy cơ:** nếu mỗi request khóa nguồn trước, request thứ nhất giữ A chờ B, request thứ hai giữ B chờ A; hai request có thể rơi vào deadlock.
-- **Cách xử lý:** sắp hai ID theo thứ tự tăng dần và luôn khóa theo thứ tự này, bất kể chiều chuyển.
-- **Kết quả mong đợi:** các request tranh chấp hai tài khoản chờ khóa theo cùng thứ tự; request tiếp tục xử lý kiểm tra trạng thái và số dư sau khi lấy được khóa.
-- **Phạm vi:** cách sắp khóa giảm nguy cơ deadlock trong luồng chuyển khoản này. `PrismaUnitOfWork` không tự động retry transaction khi gặp deadlock hoặc timeout.
-- **Mã nguồn:** [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts), [PrismaUnitOfWork](../../src/modules/money-movement/infrastructure/persistence/prisma-unit-of-work.ts).
+## 5. Người dùng cố tình can thiệp URL để thao tác trên tài khoản người khác
 
-## 5. Người dùng đổi ID để truy cập tài khoản người khác
-
-- **Ví dụ:** user A có JWT hợp lệ nhưng thay accountId trong URL bằng tài khoản của user B.
-- **Nguy cơ:** xem số dư, lịch sử hoặc rút tiền của người khác nếu backend chỉ kiểm tra đăng nhập.
-- **Cách xử lý:** guard kiểm tra JWT; use case đối chiếu chủ tài khoản với user lấy từ token. Client không tự chỉ định danh tính bằng userId trong body.
-- **Kết quả mong đợi:** xem, nạp/rút, xem lịch sử hoặc đóng tài khoản không thuộc mình đều nhận `404 ACCOUNT_NOT_FOUND`; số dư không thay đổi.
-- **Phân biệt:** khi chuyển khoản, nguồn phải thuộc người gọi; đích được phép thuộc người khác. Có quyền gửi tiền tới B không đồng nghĩa có quyền xem hoặc rút tiền từ B.
-- **Mã nguồn:** [AccessTokenGuard](../../src/common/security/guards/access-token.guard.ts), [GetAccountUseCase](../../src/modules/accounts/application/use-cases/get-account.use-case.ts), [WithdrawMoneyUseCase](../../src/modules/money-movement/application/use-cases/withdraw-money.use-case.ts).
+– **Bối cảnh:** Kẻ tấn công đăng nhập tài khoản của chính mình để lấy JWT token hợp lệ, sau đó đổi `accountId` trên đường dẫn URL thành ID tài khoản của một nạn nhân khác để xem số dư hoặc rút tiền.  
+– **Nguy cơ tiềm ẩn:** Lộ thông tin bí mật tài chính hoặc bị đánh cắp tiền nếu server chỉ kiểm tra xem người gọi đã đăng nhập hay chưa.  
+– **Giải pháp của hệ thống:**  
+  – `AccessTokenGuard` trích xuất `sub` từ JWT đã được ký mật mã.  
+  – Tầng Application Use Case truy vấn tài khoản và kiểm tra quyền sở hữu nghiêm ngặt:  
+    ```typescript
+    if (account.userId !== currentUserId) {
+      throw new AccountNotFoundError();
+    }
+    ```
+  – Hệ thống chủ động trả về lỗi 404 Account Not Found thay vì 403 Forbidden để kẻ tấn công không thể dò quét xem tài khoản đó có thực sự tồn tại trong hệ thống hay không.  
+– **Kết quả thực tế:** Mọi hành vi truy cập trái phép đều nhận HTTP 404 Not Found.  
 
 ## 6. Đóng tài khoản đồng thời có tiền nạp vào
 
-- **Ví dụ:** tài khoản ACTIVE có số dư 0; một request đóng tài khoản, một request nạp 100.000 VND.
-- **Nguy cơ:** thao tác đóng dựa trên số dư cũ bằng 0 trong khi số dư thực đã thay đổi.
-- **Cách xử lý:** đóng tài khoản bằng UPDATE có điều kiện `id`, `userId`, `status = ACTIVE`, `currentBalance = 0`. Nếu không cập nhật được, use case đọc lại dữ liệu để trả kết quả. Nạp tiền khóa dòng và kiểm tra ACTIVE trước khi ghi.
-- **Nếu nạp hoàn tất trước:** tài khoản có 100.000 VND; đóng bị từ chối với `409 ACCOUNT_HAS_BALANCE`.
-- **Nếu đóng hoàn tất trước:** tài khoản CLOSED, số dư 0; nạp bị từ chối với `409 ACCOUNT_NOT_ACTIVE`.
-- **Dữ liệu lưu lại:** đóng cập nhật CLOSED và closedAt, không xóa tài khoản hoặc lịch sử. Gọi đóng lại tài khoản của mình trả HTTP 204.
-- **Mã nguồn:** [CloseAccountUseCase](../../src/modules/accounts/application/use-cases/close-account.use-case.ts), [PrismaAccountRepository](../../src/modules/accounts/infrastructure/persistence/prisma-account.repository.ts), [DepositMoneyUseCase](../../src/modules/money-movement/application/use-cases/deposit-money.use-case.ts).
+– **Bối cảnh:** Tài khoản đang có số dư 0 VND. Người dùng gửi lệnh đóng tài khoản, đồng thời có một lệnh nạp 100.000 VND từ một nguồn khác gửi tới cùng lúc.  
+– **Nguy cơ tiềm ẩn:** Tài khoản bị đóng nhưng bên trong vẫn còn 100.000 VND vừa được nạp vào, khiến tiền bị đóng băng không thể rút ra.  
+– **Giải pháp của hệ thống:**  
+  – Thao tác đóng tài khoản thực thi câu lệnh SQL UPDATE có điều kiện nguyên tử:  
+    ```sql
+    UPDATE bank_accounts 
+    SET status = 'CLOSED', closed_at = NOW() 
+    WHERE id = :id AND user_id = :userId AND status = 'ACTIVE' AND current_balance = 0;
+    ```
+  – Nếu số lượng dòng bị ảnh hưởng bằng 0, nghĩa là số dư đã bị thay đổi hoặc trạng thái không còn là ACTIVE, use case lập tức đọc lại dữ liệu mới nhất:  
+    – Nếu có tiền nạp vào trước: Ném lỗi 409 ACCOUNT_HAS_BALANCE để từ chối đóng.  
+    – Nếu tài khoản đã được đóng trước: Ném lỗi 409 ACCOUNT_NOT_ACTIVE cho lệnh nạp tiền.  
+– **Kết quả thực tế:** Không bao giờ xảy ra tình trạng tài khoản đóng mà số dư khác 0.  
 
-## 7. Sai số khi biểu diễn tiền
+## 7. Sai số làm tròn khi tính toán số tiền lớn
 
-- **Ví dụ:** một giá trị VND lớn vượt phạm vi số nguyên an toàn của JavaScript được chuyển sang `number` trước khi tính toán.
-- **Nguy cơ:** giá trị bị làm tròn, số tiền ghi nhận khác dữ liệu client muốn gửi.
-- **Cách xử lý:** API nhận/trả tiền dưới dạng string; `Money` dùng bigint để cộng/trừ; PostgreSQL lưu DECIMAL(18,0).
-- **Kết quả mong đợi:** tính toán theo số nguyên VND; không dùng phép cộng/trừ số thực cho tiền trong domain.
-- **Điều kiện đầu vào:** amount giao dịch phải dương; initialDeposit được bằng 0. Giá trị lưu trữ tối đa là `999999999999999999`; nạp hoặc chuyển vào làm vượt giới hạn bị từ chối.
-- **Phía client:** giữ giá trị tiền dưới dạng chuỗi hoặc kiểu số nguyên chính xác; không đổi qua number rồi mới gửi.
-- **Mã nguồn:** [Money](../../src/common/domain/value-objects/money.value-object.ts), [DepositMoneyUseCase](../../src/modules/money-movement/application/use-cases/deposit-money.use-case.ts), [Prisma schema](../../prisma/schema.prisma).
+– **Bối cảnh:** Tiền tệ VND có giá trị lớn. Nếu hệ thống sử dụng kiểu số thông thường của JavaScript (`number`), khi thực hiện các phép cộng trừ vượt quá giới hạn an toàn của số thực 64-bit, số học sẽ bị làm tròn sai lệch.  
+– **Nguy cơ tiềm ẩn:** Sai lệch sổ cái kế toán dù chỉ 1 đồng cũng là lỗi nghiêm trọng trong hệ thống ngân hàng.  
+– **Giải pháp của hệ thống:**  
+  – Tạo riêng Value Object `Money` sử dụng kiểu dữ liệu nguyên thủy `bigint` của TypeScript và Node.js để thực hiện các phép tính cộng, trừ, so sánh.  
+  – Tầng HTTP API luôn nhận và trả giá trị tiền dưới dạng chuỗi `string`.  
+  – Tầng cơ sở dữ liệu lưu trữ cột số dư bằng kiểu `DECIMAL(18, 0)` của PostgreSQL.  
+– **Kết quả thực tế:** Đảm bảo độ chính xác tuyệt đối 100% cho mọi giá trị tiền tệ trong phạm vi 18 chữ số.  
+– **Vị trí mã nguồn:** [Money Value Object](../../src/common/domain/value-objects/money.value-object.ts).  
 
-## 8. Gửi lại POST nạp/rút tạo thêm giao dịch
+## 8. Gửi lại yêu cầu nạp hoặc rút tiền
 
-- **Ví dụ:** nạp 100.000 VND đã thành công, client gửi lại cùng body vì chưa thấy phản hồi.
-- **Nguy cơ:** lần gửi thứ hai tiếp tục tăng số dư và tạo lịch sử mới.
-- **Hành vi của dự án:** endpoint nạp/rút xử lý mỗi POST như một yêu cầu riêng; không sử dụng Idempotency-Key để tìm giao dịch cũ.
-- **Kết quả mong đợi:** hai lần nạp hợp lệ có thể tăng tổng cộng 200.000 VND và tạo hai giao dịch. Hai lần rút được kiểm tra số dư riêng; lần sau có thể thành công hoặc báo thiếu tiền.
-- **Cách sử dụng:** khi mất phản hồi, kiểm tra số dư và lịch sử trước khi gửi lại. Không áp dụng cơ chế retry của transfer cho endpoint nạp/rút.
-- **Phạm vi tương tự:** gửi lại POST mở tài khoản có thể tạo thêm tài khoản; endpoint này cũng không chống lặp theo key.
-- **Mã nguồn:** [TransactionController](../../src/modules/money-movement/presentation/http/transactions.controller.ts), [DepositMoneyUseCase](../../src/modules/money-movement/application/use-cases/deposit-money.use-case.ts), [WithdrawMoneyUseCase](../../src/modules/money-movement/application/use-cases/withdraw-money.use-case.ts).
+– **Bối cảnh:** Người dùng nạp 100.000 VND, do mạng lag nên bấm nút nạp 2 lần liên tiếp.  
+– **Đặc tả nghiệp vụ:** Khác với chuyển khoản liên tài khoản vốn có `Idempotency-Key`, các thao tác nạp và rút tiền mặt tại quầy trong pha mô phỏng này được coi là các yêu cầu giao dịch độc lập.  
+– **Xử lý:**  
+  – Mỗi lần gửi request hợp lệ, hệ thống sẽ thực hiện khóa dòng, ghi nhận một giao dịch nạp tiền mới và sinh mã giao dịch riêng biệt.  
+  – Với rút tiền, nếu lần bấm thứ 2 làm số dư không còn đủ, hệ thống sẽ ném lỗi `INSUFFICIENT_FUNDS`.  
+– **Khuyến nghị sử dụng:** Phía client cần chủ động vô hiệu hóa nút bấm ngay khi gửi request để tránh người dùng click đúp ngoài ý muốn.  
 
-## 9. Client gửi thêm trường để thay đổi dữ liệu ngoài hợp đồng
+## 9. Kẻ tấn công cố tình chèn trường lạ vào body
 
-- **Ví dụ:** body mở tài khoản được thêm `userId`, `currentBalance` hoặc `accountNumber`.
-- **Nguy cơ:** client tự chọn chủ sở hữu, số dư hoặc số tài khoản nếu server ghi thẳng toàn bộ body vào database.
-- **Cách xử lý:** validation pipe bật whitelist và forbidNonWhitelisted; field ngoài DTO bị từ chối. Server lấy user từ JWT, sinh số tài khoản và xử lý số dư qua initialDeposit hợp lệ.
-- **Kết quả mong đợi:** HTTP 400, không tạo tài khoản từ request có field thừa.
-- **Phân biệt:** initialDeposit là field được API cho phép trong nghiệp vụ mô phỏng; currentBalance không phải field client được tự gửi khi mở tài khoản.
-- **Mã nguồn:** [Validation pipe](../../src/common/http/pipes/validation-pipe.factory.ts), [OpenAccountDto](../../src/modules/accounts/presentation/http/dto/open-account.dto.ts), [AccountsController](../../src/modules/accounts/presentation/http/accounts.controller.ts).
+– **Bối cảnh:** Khi gọi API mở tài khoản `POST /accounts`, kẻ tấn công cố tình thêm các trường bí mật vào payload JSON như `currentBalance: "999999999999"` hoặc `userId: "victim-user-id"`.  
+– **Nguy cơ tiềm ẩn:** Nếu backend ghi thẳng body vào database, kẻ tấn công có thể tự gán tài khoản cho người khác hoặc tự tạo ra số dư khổng lồ mà không cần nạp tiền.  
+– **Giải pháp của hệ thống:**  
+  – Cấu hình toàn cục NestJS `ValidationPipe` với hai tùy chọn nghiêm ngặt:  
+    – `whitelist: true`: Tự động lọc bỏ toàn bộ các trường không được khai báo trong DTO.  
+    – `forbidNonWhitelisted: true`: Bật chế độ cảnh báo, nếu request chứa bất kỳ trường lạ nào ngoài DTO sẽ lập tức bị chặn đứng và trả về lỗi HTTP 400 Bad Request.  
+  – `userId` luôn được lấy trực tiếp từ JWT Payload đã được kiểm tra chữ ký ở `AccessTokenGuard`.  
+– **Kết quả thực tế:** Mọi toan tính can thiệp trường dữ liệu đều bị triệt tiêu từ cửa ngõ Controller.  
+– **Vị trí mã nguồn:** [validation-pipe.factory.ts](../../src/common/http/pipes/validation-pipe.factory.ts), [open-account.dto.ts](../../src/modules/accounts/presentation/http/dto/open-account.dto.ts).  

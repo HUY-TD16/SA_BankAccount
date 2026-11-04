@@ -1,4 +1,4 @@
-# Database
+# Thiết kế cơ sở dữ liệu
 
 [Mục lục](README.md) · [README dự án](../../README.md)
 

@@ -1,19 +1,23 @@
-# Tài liệu chi tiết — SA Bank Account
+# Tài liệu kỹ thuật chi tiết - SA Bank Account
 
-[README dự án](../../README.md)
+Mục lục tài liệu kỹ thuật dành cho giảng viên và thành viên nhóm phát triển, mô tả chi tiết kiến trúc, cơ sở dữ liệu, API và các quy trình vận hành hệ thống.
 
-Bộ tài liệu mô tả kiến trúc, dữ liệu, hợp đồng API, quy tắc nghiệp vụ và cách vận hành SA Bank Account. Nội dung tham chiếu tới controller, DTO, use case, Prisma schema, migration và cấu hình chạy.
+## Danh mục tài liệu chuyên đề
 
-| Tài liệu | Nội dung | Đối tượng đọc |
-| --- | --- | --- |
-| [01 — Kiến trúc](01-architecture.md) | Module, các lớp, dependency, transaction, sơ đồ luồng request và các bước bảo mật (JWT, DTO, quyền sở hữu, bcrypt) | Người đánh giá thiết kế, lập trình viên |
-| [02 — Database](02-database.md) | ERD, từ điển dữ liệu, index, constraint, migration | Người phát triển và quản lý dữ liệu |
-| [03 — API](03-api.md) | Đầy đủ 9 endpoint, request/response, lỗi, phân trang | Người tích hợp client, kiểm thử |
-| [04 — Nghiệp vụ](04-business-rules.md) | Use case, điều kiện, kết quả, retry và tình huống đồng thời | Người tìm hiểu bài toán |
-| [05 — Chạy dự án](05-running.md) | Docker, môi trường local, demo PowerShell | Người chạy thử |
-| [06 — Kiểm thử](06-testing.md) | Unit, integration, Swagger contract và HTTP E2E | Người kiểm chứng hệ thống |
-| [08 — Các tình huống và cơ chế xử lý](08-problem-scenarios.md) | Ví dụ, nguy cơ, cách xử lý, kết quả và mã nguồn liên quan | Người tìm hiểu nghiệp vụ và kiểm thử |
+| STT | Tài liệu | Nội dung chính | Đối tượng tham khảo |
+| :---: | :--- | :--- | :--- |
+| **01** | [Kiến trúc hệ thống](01-architecture.md) | Phân tầng Clean Architecture, Hexagonal Architecture, Modular Monolith, quy trình Dependency Injection và sơ đồ luồng request. | Đánh giá thiết kế, lập trình viên |
+| **02** | [Thiết kế cơ sở dữ liệu](02-database.md) | Sơ đồ quan hệ thực thể, từ điển dữ liệu 4 bảng chính, chỉ mục index và các ràng buộc toàn vẹn CHECK constraints. | Quản trị dữ liệu, backend dev |
+| **03** | [Đặc tả REST API](03-api.md) | Danh sách chi tiết 9 endpoints, cấu trúc request và response, validation rules, phân trang và chuẩn mã lỗi HTTP. | Tích hợp frontend, kiểm thử API |
+| **04** | [Quy tắc nghiệp vụ](04-business-rules.md) | Mô hình hóa 8 use cases, vòng đời tài khoản từ mở đến đóng, quy tắc tiền tệ VND và tính bất biến của sổ cái. | Phân tích nghiệp vụ, tester |
+| **05** | [Hướng dẫn chạy dự án](05-running.md) | Quy trình thiết lập môi trường Docker Compose, cấu hình file môi trường và kịch bản demo nhanh trên Swagger UI. | Cài đặt, triển khai demo |
+| **06** | [Quy trình kiểm thử](06-testing.md) | Hướng dẫn chạy các bộ test tự động: Unit test, Integration test, Swagger Contract test và HTTP E2E test. | Đảm bảo chất lượng |
+| **07** | [Đánh giá kiến trúc và đánh đổi](07-introduce-review.md) | Phân tích các đánh đổi kỹ thuật giữa Monolith và Microservices, khóa bi quan và khóa lạc quan, giới hạn và định hướng nâng cấp. | Đánh giá học thuật, báo cáo bảo vệ |
+| **08** | [9 tình huống xung đột đồng thời](08-problem-scenarios.md) | Phân tích sâu 9 kịch bản lỗi thực tế gồm rút quá số dư, deadlock khi chuyển chéo, gửi lại lệnh sau timeout, can thiệp URL và giải pháp mã nguồn. | Vấn đáp kỹ thuật, thuyết trình |
 
-Lộ trình đọc: README → nghiệp vụ → kiến trúc → database. Khi cần chạy demo, đọc phần chạy dự án rồi dùng tài liệu API. Các lệnh shell đều chạy tại thư mục gốc repository, trừ khi ghi rõ khác.
+## Lộ trình đọc tài liệu khuyến nghị
 
-Nguồn kiểm chứng chính: [src](../../src), [schema](../../prisma/schema.prisma), [migration](../../prisma/migrations), [scripts](../../package.json), [test](../../test). Khi thay đổi endpoint hoặc nghiệp vụ, cập nhật tài liệu tương ứng và Swagger cùng lần thay đổi mã nguồn.
+1. **Để nắm tổng quan dự án:** Bắt đầu từ [README.md](../../README.md) ở thư mục gốc $\rightarrow$ [04 — Quy tắc nghiệp vụ](04-business-rules.md).
+2. **Để đánh giá thiết kế kỹ thuật:** Đọc [01 — Kiến trúc hệ thống](01-architecture.md) $\rightarrow$ [02 — Thiết kế cơ sở dữ liệu](02-database.md) $\rightarrow$ [07 — Đánh giá kiến trúc](07-introduce-review.md).
+3. **Để chuẩn bị vấn đáp và thuyết trình:** Đọc kỹ [08 — 9 tình huống xung đột đồng thời](08-problem-scenarios.md) và [Báo cáo đo tải Kaggle](../performance/phase1-load-test.md).
+4. **Để cài đặt và chạy thử nghiệm:** Xem [05 — Hướng dẫn chạy dự án](05-running.md) kết hợp [03 — Đặc tả REST API](03-api.md).

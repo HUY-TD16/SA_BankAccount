@@ -6,8 +6,8 @@
 
 SA Bank Account là **modular monolith**: một ứng dụng NestJS chứa ba module nghiệp vụ và dùng chung một PostgreSQL. Bên trong ứng dụng, mã nguồn áp dụng các nguyên tắc của **Clean Architecture** và **Hexagonal Architecture (Ports & Adapters)**:
 
-- **Clean Architecture:** phân chia presentation, application, domain và infrastructure. Use case và domain không import NestJS hay Prisma; module NestJS kết nối các thành phần bằng dependency injection.
-- **Hexagonal Architecture:** controller HTTP tiếp nhận yêu cầu và gọi use case; các port định nghĩa hợp đồng mà nghiệp vụ cần, còn adapter hiện thực hợp đồng bằng Prisma, JWT hoặc bcrypt. Ví dụ, `UnitOfWorkPort` được triển khai bởi `PrismaUnitOfWork`.
+– **Clean Architecture:** phân chia presentation, application, domain và infrastructure. Use case và domain không import NestJS hay Prisma; module NestJS kết nối các thành phần bằng dependency injection.  
+– **Hexagonal Architecture:** controller HTTP tiếp nhận yêu cầu và gọi use case; các port định nghĩa hợp đồng mà nghiệp vụ cần, còn adapter hiện thực hợp đồng bằng Prisma, JWT hoặc bcrypt. Ví dụ, `UnitOfWorkPort` được triển khai bởi `PrismaUnitOfWork`.  
 
 Các module được triển khai cùng ứng dụng và sử dụng chung database. Khi chuyển khoản, việc cập nhật số dư nguồn, số dư đích và ghi lịch sử được thực hiện trong cùng một database transaction.
 
@@ -331,13 +331,13 @@ Bcrypt băm mật khẩu khi đăng ký và kiểm tra mật khẩu khi đăng n
 
 ### 5.4. Mã nguồn để đối chiếu
 
-- [main.ts](../../src/main.ts): đăng ký middleware, interceptor, validation pipe và exception filter.
-- [AppModule](../../src/app.module.ts): đăng ký `AccessTokenGuard` toàn cục bằng `APP_GUARD`.
-- [AccessTokenGuard](../../src/common/security/guards/access-token.guard.ts): xác thực JWT và xử lý route public.
-- [ValidationPipe](../../src/common/http/pipes/validation-pipe.factory.ts): cấu hình kiểm tra đầu vào.
-- [TransfersController](../../src/modules/money-movement/presentation/http/transfers.controller.ts) và [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts): lấy danh tính, kiểm tra quyền và điều phối chuyển tiền.
-- [LoginUseCase](../../src/modules/identity/application/use-cases/login.use-case.ts): kiểm tra mật khẩu qua port và yêu cầu tạo JWT.
-- [BcryptPasswordHasher](../../src/modules/identity/infrastructure/security/bcrypt-password-hasher.ts) và [JwtTokenService](../../src/modules/identity/infrastructure/security/jwt-token.service.ts): adapter bảo mật.
+– [main.ts](../../src/main.ts): đăng ký middleware, interceptor, validation pipe và exception filter.  
+– [AppModule](../../src/app.module.ts): đăng ký `AccessTokenGuard` toàn cục bằng `APP_GUARD`.  
+– [AccessTokenGuard](../../src/common/security/guards/access-token.guard.ts): xác thực JWT và xử lý route public.  
+– [ValidationPipe](../../src/common/http/pipes/validation-pipe.factory.ts): cấu hình kiểm tra đầu vào.  
+– [TransfersController](../../src/modules/money-movement/presentation/http/transfers.controller.ts) và [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts): lấy danh tính, kiểm tra quyền và điều phối chuyển tiền.  
+– [LoginUseCase](../../src/modules/identity/application/use-cases/login.use-case.ts): kiểm tra mật khẩu qua port và yêu cầu tạo JWT.  
+– [BcryptPasswordHasher](../../src/modules/identity/infrastructure/security/bcrypt-password-hasher.ts) và [JwtTokenService](../../src/modules/identity/infrastructure/security/jwt-token.service.ts): adapter bảo mật.  
 
 ## 6. Luồng chuyển khoản
 
@@ -388,8 +388,8 @@ Lịch sử giao dịch được ghi và đọc qua API; API không cung cấp t
 
 ## 8. Điểm bắt đầu đọc mã
 
-- [Bootstrap HTTP](../../src/main.ts) và [AppModule](../../src/app.module.ts).
-- [MoneyMovementModule](../../src/modules/money-movement/money-movement.module.ts): cấu hình DI.
-- [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts): điều phối chuyển tiền.
-- [PrismaUnitOfWork](../../src/modules/money-movement/infrastructure/persistence/prisma-unit-of-work.ts): transaction context và khóa dòng.
-- [PrismaAccountRepository](../../src/modules/accounts/infrastructure/persistence/prisma-account.repository.ts): mở/đóng tài khoản.
+– [Bootstrap HTTP](../../src/main.ts) và [AppModule](../../src/app.module.ts).  
+– [MoneyMovementModule](../../src/modules/money-movement/money-movement.module.ts): cấu hình DI.  
+– [TransferMoneyUseCase](../../src/modules/money-movement/application/use-cases/transfer-money.use-case.ts): điều phối chuyển tiền.  
+– [PrismaUnitOfWork](../../src/modules/money-movement/infrastructure/persistence/prisma-unit-of-work.ts): transaction context và khóa dòng.  
+– [PrismaAccountRepository](../../src/modules/accounts/infrastructure/persistence/prisma-account.repository.ts): mở/đóng tài khoản.  

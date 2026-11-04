@@ -1,67 +1,92 @@
-# Kiểm thử
+# Hướng dẫn thực thi kiểm thử toàn diện
 
-[Mục lục](README.md) · [README dự án](../../README.md)
+Tài liệu hướng dẫn chi tiết cách chạy 4 cấp độ kiểm thử của hệ thống: **Unit Test**, **Swagger Contract Test**, **Integration Test** và **End-to-End Test**, cùng phương pháp chạy kiểm thử tải trên máy chủ Kaggle.
 
-Các lệnh chạy tại thư mục gốc repository. Bộ kiểm thử gồm unit, integration, hợp đồng Swagger và HTTP E2E.
+## 1. Unit test và Swagger contract test
 
-## 1. Kiểm thử
+Các bài kiểm thử đơn vị tập trung kiểm tra tính đúng đắn của logic nghiệp vụ tại tầng Domain và Use Case bằng cách sử dụng các Mock/Fake Repository mà không cần kết nối tới cơ sở dữ liệu thật.
 
-### Unit và hợp đồng Swagger
-
+### Cách thực hiện
 ```powershell
+# 1. Cài đặt dependencies
 npm ci
+
+# 2. Sinh Prisma Client type-safe
 npx prisma generate
+
+# 3. Chạy toàn bộ 25 Unit Test Suites
 npm test -- --runInBand
+
+# 4. Chạy kiểm tra hợp đồng Swagger OpenAPI
 npm run test:swagger
 ```
 
-Unit test kiểm tra nghiệp vụ và các thành phần riêng lẻ; test Swagger kiểm tra tài liệu sinh từ source. HTTP E2E kiểm tra luồng request/response trên ứng dụng đang chạy.
+– **Kết quả mong đợi:** 25/25 test suites passed (100%), bao phủ toàn bộ các use case: đăng ký, đăng nhập, mở tài khoản, nạp tiền, rút tiền, chuyển khoản và kiểm tra Value Object `Money`.  
+– **`npm run test:swagger`:** Khởi chạy một server HTTP loopback tạm thời để kiểm tra xem cấu trúc Swagger Document sinh ra có khớp chính xác với DTO và Response Envelope hay không.  
 
-### E2E qua HTTP thật
+## 2. Integration test với PostgreSQL
 
-Tạo PostgreSQL test riêng; cần Docker đang chạy và Node.js 24 trên host:
+Integration test kiểm chứng sự tương tác thực tế giữa ứng dụng và cơ sở dữ liệu PostgreSQL: kiểm tra câu lệnh khóa dòng `SELECT ... FOR UPDATE`, cơ chế rollback khi lỗi, và các ràng buộc toàn vẹn CHECK constraint.
+
+### 2.1. Chuẩn bị database test riêng biệt
+Để đảm bảo an toàn, hệ thống yêu cầu cơ sở dữ liệu test phải có tên kết thúc bằng hậu tố `_test`. Bạn có thể bật nhanh một container PostgreSQL test độc lập bằng Docker:
 
 ```powershell
-docker run --name bank-http-e2e -e POSTGRES_USER=e2e -e POSTGRES_PASSWORD=e2e_local_test -e POSTGRES_DB=bank_http_test -p 55432:5432 -d postgres:15-alpine
-docker exec bank-http-e2e pg_isready -U e2e -d bank_http_test
-# Chờ pg_isready báo accepting connections trước khi chạy test.
-$env:E2E_DATABASE_URL = 'postgresql://e2e:e2e_local_test@localhost:55432/bank_http_test?schema=public'
-npm run test:e2e
+# Khởi tạo container PostgreSQL riêng cho kiểm thử
+docker run --name bank-db-test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=bank_account_test -p 55432:5432 -d postgres:15-alpine
+
+# Chờ vài giây cho PostgreSQL sẵn sàng nhận kết nối
+docker exec bank-db-test pg_isready -U postgres -d bank_account_test
 ```
 
-Runner tự generate Prisma Client, build, migrate DB test, khởi động `dist/main.js` trên cổng tự chọn và gửi HTTP thật. Không cần khởi động app trước. Bộ test hiện có 6 test case, bao phủ luồng ngân hàng, guard, DTO, ownership, status code, response envelope và replay transfer.
-
-**Database phải tồn tại trước**, tên kết thúc bằng `_test`. Nếu thiếu `E2E_DATABASE_URL`, runner dùng `DATABASE_URL` và vẫn kiểm tra hậu tố. Dùng DB riêng cho test; không chạy đồng thời với tác vụ reset DB đó.
-
-Mỗi lần chạy suite dùng `runId` riêng. Hook kết thúc dừng app và xóa dữ liệu của lần chạy, giữ schema/migration; các case trong suite có dùng chung fixture. Nếu process bị kill hoặc máy tắt đột ngột, cleanup có thể không chạy.
-
-Chạy lại: `docker start bank-http-e2e`, đặt lại biến môi trường nếu mở terminal mới, rồi `npm run test:e2e`. Khi không cần DB test nữa, xóa riêng container bằng `docker rm -f -v bank-http-e2e`.
-
-### Integration với PostgreSQL
-
-Dùng DB test ở trên, đặt `DATABASE_URL` trong cùng terminal:
+### 2.2. Chạy migration và thực thi test suites
+Trong cùng cửa sổ PowerShell đó, thiết lập chuỗi kết nối và chạy lệnh test:
 
 ```powershell
-$env:DATABASE_URL = 'postgresql://e2e:e2e_local_test@localhost:55432/bank_http_test?schema=public'
+# Gán biến môi trường trỏ vào database test
+$env:DATABASE_URL = 'postgresql://postgres:postgres@localhost:55432/bank_account_test?schema=public'
+
+# Áp dụng migration vào DB test
 npx prisma migrate deploy
+
+# Chạy toàn bộ Integration Tests
 npx jest --config jest.integration.config.js --runInBand
-# Hoặc chỉ kiểm tra CHECK constraint:
+
+# Hoặc chạy riêng bộ kiểm tra 9 ràng buộc CHECK Constraint:
 npx jest --config jest.integration.config.js --runInBand test/integration/database/check-constraints.spec.ts
 ```
 
-Integration kiểm tra repository, transaction và database; `banking-flow.spec.ts` gọi trực tiếp use case. Bộ CHECK constraint tạo schema riêng, áp dụng migration và thử SQL vi phạm. HTTP E2E nằm ở `test/e2e/banking-http.e2e.cjs` và chạy bằng Node test runner, không dùng Jest.
+– **`check-constraints.spec.ts`:** Tự động tạo schema tạm thời, cố tình thực hiện các thao tác SQL vi phạm như chèn số dư âm, email viết hoa, chuyển khoản cùng tài khoản và xác nhận PostgreSQL trả về đúng mã lỗi `23514` (`check_violation`).  
 
-Lỗi thường gặp:
+## 3. HTTP End-to-End test
 
-- `ECONNREFUSED`: kiểm tra Docker/PostgreSQL và cổng trong URL.
-- `Integration tests require a dedicated *_test DATABASE_URL`: đặt URL tới DB test trong đúng terminal đang chạy Jest.
-- E2E báo DB không tồn tại: tạo DB trước; migration không thay thế bước chuẩn bị DB của runner.
-- Swagger không mở: kiểm tra `NODE_ENV`; production hiện không expose Swagger.
+Bộ test E2E kiểm tra toàn bộ luồng hoạt động từ ngoài vào trong: gửi các HTTP Request thật qua mạng, đi qua Middleware, Guard, Interceptor, Controller, Use Case và ghi xuống database thật.
 
-## 2. Kiểm thử tải và hướng phát triển Pha 2
+### Cách thực hiện
+```powershell
+# Đặt biến môi trường DB test cho bộ E2E runner
+$env:E2E_DATABASE_URL = 'postgresql://postgres:postgres@localhost:55432/bank_account_test?schema=public'
 
-Đề bài yêu cầu kiểm thử tải trên **Kaggle CPU**. Repository hiện chưa có kịch bản chạy được hoặc số liệu; không xem kết quả unit/E2E là bằng chứng hiệu năng.
+# Chạy test E2E
+npm run test:e2e
+```
 
-Để hoàn tất yêu cầu này, nhóm cần bổ sung workload tối thiểu gồm login, list account và debit đồng thời; lưu cấu hình CPU/RAM, phiên bản source, dữ liệu đầu vào, số client, thời lượng, throughput, p50/p95/p99 và error rate. Khi so sánh Pha 2 phải giữ cùng cấu hình phần cứng, workload và cách đo, đồng thời kiểm tra invariant số dư sau tải.
+– **Cơ chế hoạt động:** E2E runner tự động build mã nguồn TypeScript, chạy migration, tự khởi động server NestJS trên một cổng ngẫu nhiên và gửi các request HTTP thật.  
+– **Phạm vi kiểm tra:** Xác thực JWT token, luồng mở tài khoản, nạp tiền, rút tiền, kiểm tra mã HTTP status, cấu trúc response envelope và kiểm chứng tính năng phát lại giao dịch khi dùng cùng `Idempotency-Key`.  
 
-Các đề xuất Pha 2 như rate limiting, idempotency có so payload, caching hoặc quan sát metrics/tracing cần được chọn dựa trên kết quả baseline và đánh giá trước/sau, theo yêu cầu đề bài.
+## 4. Kiểm thử tải hệ thống trên Kaggle CPU
+
+Để đo lường hiệu năng thực tế trong điều kiện chịu tải cao và kiểm tra cơ chế chống rút quá số dư, nhóm sử dụng công cụ **Grafana k6** chạy trên nền tảng máy chủ **Kaggle CPU** (4 vCPUs Xeon, 30 GB RAM).
+
+### Các tài nguyên kiểm thử tải
+– **Notebook thực thi:** `docs/performance/kaggle-load-test.ipynb`.  
+– **Kịch bản đo k6:** `test/performance/kaggle-load.js`.  
+– **Cấu hình thông số test:** `test/performance/protocol.json`.  
+– **Báo cáo phân tích chi tiết:** [Báo cáo Kiểm thử Tải Pha 1](../performance/phase1-load-test.md).  
+
+### Tóm tắt kết quả đo đạc
+– Thực hiện **27 lượt đo chính thức** (mỗi lượt 60 giây, 10 giây warm-up riêng).  
+– Tổng số requests xử lý: **76.960 requests**, tỉ lệ lỗi **0.00%**.  
+– Luồng chỉ đọc (Xem tài khoản) mở rộng tuyến tính hoàn hảo, đạt **188.60 req/giây** với độ trễ trung vị p50 chỉ **khoảng 4ms**.  
+– Luồng ghi cạnh tranh (Rút tiền đồng thời) đạt **99.44 req/giây**, cơ chế khóa dòng đảm bảo 100% không có tài khoản nào bị âm tiền.  
+– Luồng đăng nhập đạt đỉnh bão hòa ở **khoảng 11.75 req/giây** do tận dụng tối đa 100% công suất tính toán của 4 lõi CPU cho thuật toán băm Bcrypt an toàn.  

@@ -1,91 +1,145 @@
-# Chạy dự án và thử API
+# Hướng dẫn khởi chạy dự án và kịch bản thử nghiệm
 
-[Mục lục](README.md) · [README dự án](../../README.md)
+Tài liệu hướng dẫn các bước thiết lập môi trường, khởi động hệ thống và chạy thử kịch bản demo mẫu từ máy sạch.
 
-Các lệnh chạy tại thư mục gốc repository.
+## 1. Khởi chạy bằng Docker Compose
 
-## 1. Chạy bằng Docker từ máy sạch
+Cách tiếp cận này không yêu cầu cài đặt sẵn Node.js hay PostgreSQL trên máy host. Toàn bộ môi trường đã được đóng gói thành các container độc lập.
 
-Cần Git và Docker Engine/Desktop đang chạy, có Compose v2. Không cần Node.js hay PostgreSQL trên host. Các lệnh bên dưới dùng **PowerShell**, chạy tại thư mục repository.
+### 1.1. Yêu cầu tiên quyết
+– Đã cài đặt **Git**.  
+– Đã cài đặt **Docker Desktop** hoặc Docker Engine trên Linux hỗ trợ Compose v2.  
 
-```powershell
-git clone https://github.com/HUY-TD16/SA_BankAccount.git
-cd SA_BankAccount
-if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-```
+### 1.2. Các bước khởi chạy
 
-Nếu đã có repository, chỉ sao chép `.env.example` khi chưa có `.env`; giữ cấu hình hiện có nếu đã chạy trước đó. Sửa `.env` trước khi chạy:
+1. **Clone mã nguồn và khởi tạo file cấu hình:**
+   ```powershell
+   git clone https://github.com/HUY-TD16/SA_BankAccount.git
+   cd SA_BankAccount
+   if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+   ```
 
-| Biến | Mục đích |
-| --- | --- |
-| `DB_USER`, `DB_PASSWORD`, `DB_NAME` | User, mật khẩu và DB được PostgreSQL tạo ở lần chạy đầu |
-| `DB_PORT` | Cổng PostgreSQL trên host, mặc định 5432 |
-| `DATABASE_URL` | URL cho app/Prisma chạy trên host: `localhost:<DB_PORT>` |
-| `DOCKER_DATABASE_URL` | URL trong Compose: `postgres:5432` |
-| `APP_PORT` | Cổng HTTP trên host, mặc định 3000 |
-| `NODE_ENV` | `production` mặc định trong Compose; dùng `development` để mở Swagger |
-| `JWT_ACCESS_SECRET` | Thay placeholder bằng secret riêng, ngẫu nhiên đủ mạnh |
-| `JWT_ACCESS_TTL` | Hạn access token, mặc định `60m` |
-| `BCRYPT_ROUNDS` | Chi phí băm mật khẩu, mặc định 12 |
+2. **Kiểm tra file cấu hình môi trường:**
+   Đảm bảo các giá trị trong `.env` phù hợp với máy của bạn:
+   ```env
+   DB_USER=khanhNguyenHong2311
+   DB_PASSWORD=az1978bl
+   DB_NAME=bank_account
+   DB_PORT=5434
+   DATABASE_URL="postgresql://khanhNguyenHong2311:az1978bl@localhost:5434/bank_account?schema=public"
+   DOCKER_DATABASE_URL="postgresql://khanhNguyenHong2311:az1978bl@postgres:5432/bank_account?schema=public"
+   APP_PORT=3000
+   NODE_ENV=development
+   JWT_ACCESS_SECRET=khoa_bi_mat_jwt_cho_do_an_kien_truc_phan_mem_2026
+   JWT_ACCESS_TTL=60m
+   BCRYPT_ROUNDS=12
+   ```
 
-Hai URL phải dùng đúng thông tin DB đã chọn. Khi mật khẩu chứa ký tự đặc biệt, URL-encode phần mật khẩu trong URL; `DB_PASSWORD` giữ giá trị gốc. Không commit `.env` chứa secret.
+   > [!TIP]
+   > - `NODE_ENV=development`: Cần thiết để Swagger UI được kích hoạt tại `http://localhost:3000/api/docs`.
+   > - Nếu cổng `5432` trên máy host bị dịch vụ PostgreSQL cũ chiếm dụng, bạn có thể đổi `DB_PORT=5434` như mẫu trên để tránh xung đột cổng.
 
-```powershell
-docker compose up --build -d --wait --wait-timeout 180
-docker compose ps -a
-```
+3. **Khởi động các container:**
+   ```powershell
+   docker compose up --build -d
+   ```
+   Lệnh này thực hiện tuần tự 3 việc:
+   – Khởi động service `postgres` và chờ kiểm tra trạng thái khỏe mạnh.  
+   – Chạy container `migrate` thực thi lệnh `prisma migrate deploy` để tạo bảng và các ràng buộc CHECK constraint.  
+   – Khởi động backend NestJS `app` lắng nghe tại cổng `3000`.  
 
-Kết quả mong đợi: `postgres` healthy → `migrate` exit 0 → `app` healthy. Migration tự chạy bằng `prisma migrate deploy` trước khi app khởi động. API ở `http://localhost:3000/api/v1` nếu giữ cổng mặc định.
+4. **Kiểm tra trạng thái các container:**
+   ```powershell
+   docker compose ps
+   ```
+   Kết quả mong đợi: `postgres` (healthy), `migrate` (exited 0), `app` (healthy).
 
-Để xem tài liệu, đặt `NODE_ENV=development` trong `.env`, chạy `docker compose up -d`, rồi mở [Swagger UI](http://localhost:3000/api/docs) hoặc [OpenAPI JSON](http://localhost:3000/api/docs.json). Nút **Authorize** nhận access token sau đăng nhập, không nhập thêm chữ `Bearer`. Swagger được bật khi `NODE_ENV` khác `production`.
+5. **Xem log ứng dụng khi cần kiểm tra:**
+   ```powershell
+   docker compose logs -f app
+   ```
 
-```powershell
-docker compose logs --tail 100 app migrate
-docker compose down
-# Sau khi cập nhật source/migration:
-docker compose up --build -d --wait --wait-timeout 180
-```
+6. **Dừng hệ thống:**
+   ```powershell
+   docker compose down
+   # Nếu muốn xóa sạch volume cơ sở dữ liệu để chạy lại từ đầu:
+   docker compose down -v
+   ```
 
-`down` giữ dữ liệu trong named volume; `down --volumes` xóa dữ liệu. Đổi thông tin DB trong `.env` không tự đổi user/database trong volume đã khởi tạo. Để kiểm tra máy sạch, dùng project riêng (`docker compose -p sa-bankaccount-clean ...`) và cổng riêng; giữ cùng tên project trong mọi lệnh của lần kiểm tra.
+## 2. Khởi chạy ở môi trường phát triển local
 
-Image dùng build nhiều stage, chạy bằng user `node`, không chép `.env` vào image. Healthcheck app kiểm tra route bảo vệ trả `401` sau bootstrap để xác nhận ứng dụng đang phục vụ HTTP. Kết nối DB được sử dụng khi ứng dụng thực hiện truy vấn; healthcheck này không truy vấn DB.
+Nếu bạn muốn chạy trực tiếp mã nguồn bằng Node.js trên máy host để debug code:
 
-## 2. Chạy phát triển trên host
+1. **Yêu cầu:** Node.js v24.x, npm, và một cơ sở dữ liệu PostgreSQL đang chạy.
+2. **Cài đặt dependencies và generate Prisma client:**
+   ```powershell
+   npm install
+   npx prisma generate
+   ```
+3. **Chạy migration database:**
+   ```powershell
+   npx prisma migrate deploy
+   ```
+4. **Khởi động server ở chế độ tự reload khi sửa code:**
+   ```powershell
+   npm run start:dev
+   ```
 
-Cần Node.js 24 và PostgreSQL. Sau khi tạo `.env`, có thể chỉ chạy DB bằng Compose:
+## 3. Kịch bản thử nghiệm nhanh bằng PowerShell
 
-```powershell
-npm ci
-docker compose up -d --wait postgres
-# Thay user/password/DB bằng giá trị thật trong .env:
-$env:DATABASE_URL = 'postgresql://your_db_user:your_password_here@localhost:5432/your_database_name?schema=public'
-$env:NODE_ENV = 'development'
-npx prisma generate
-npx prisma migrate deploy
-npm run start:dev
-```
-
-Prisma CLI dùng `dotenv`, không tự nội suy `${DB_USER}` trong URL mẫu như Compose. Vì vậy hãy đặt `DATABASE_URL` hoàn chỉnh trong terminal như trên hoặc sửa thành URL hoàn chỉnh trong `.env`. `JWT_ACCESS_SECRET` vẫn lấy từ `.env`. App trên host dùng `PORT` (mặc định 3000); `APP_PORT` chỉ dành cho ánh xạ cổng Compose.
-
-## 3. Thử API nhanh
-
-Sau khi app chạy, thực hiện đăng ký → đăng nhập → mở tài khoản → xem danh sách:
+Nếu không muốn mở trình duyệt Swagger UI, bạn có thể mở một cửa sổ PowerShell mới và dán toàn bộ đoạn script dưới đây để chạy tự động một vòng đời tài khoản hoàn chỉnh từ đăng ký đến đóng tài khoản:
 
 ```powershell
 $baseUrl = 'http://localhost:3000/api/v1'
-$email = "demo-$([guid]::NewGuid().ToString('N'))@example.test"
-$register = @{ fullName='Demo User'; email=$email; password='DemoTest123!'; confirmPassword='DemoTest123!' } | ConvertTo-Json
-Invoke-RestMethod "$baseUrl/auth/register" -Method Post -ContentType 'application/json' -Body $register
-$login = @{ email=$email; password='DemoTest123!' } | ConvertTo-Json
-$session = Invoke-RestMethod "$baseUrl/auth/login" -Method Post -ContentType 'application/json' -Body $login
-$headers = @{ Authorization="Bearer $($session.data.accessToken)" }
-$body = @{ accountName='Demo account'; accountType='PAYMENT'; initialDeposit='0' } | ConvertTo-Json
-$account = Invoke-RestMethod "$baseUrl/accounts" -Method Post -Headers $headers -ContentType 'application/json' -Body $body
-Invoke-RestMethod "$baseUrl/accounts" -Headers $headers
-# Đóng tài khoản vừa tạo, số dư đang bằng 0:
-Invoke-RestMethod "$baseUrl/accounts/$($account.data.id)" -Method Delete -Headers $headers
+$randomSuffix = Get-Random
+$email = "test_user_$randomSuffix@bank.test"
+
+Write-Host "1. Đang đăng ký người dùng mới: $email..." -ForegroundColor Cyan
+$regBody = @{
+    fullName = "Nguyen Van Test"
+    email = $email
+    password = "Password123!"
+    confirmPassword = "Password123!"
+} | ConvertTo-Json
+$regRes = Invoke-RestMethod "$baseUrl/auth/register" -Method Post -ContentType 'application/json' -Body $regBody
+
+Write-Host "2. Đang đăng nhập lấy JWT token..." -ForegroundColor Cyan
+$loginBody = @{ email = $email; password = "Password123!" } | ConvertTo-Json
+$loginRes = Invoke-RestMethod "$baseUrl/auth/login" -Method Post -ContentType 'application/json' -Body $loginBody
+$token = $loginRes.data.accessToken
+$headers = @{ Authorization = "Bearer $token" }
+
+Write-Host "3. Đang mở tài khoản thanh toán mới (Số dư ban đầu = 0)..." -ForegroundColor Cyan
+$openAccBody = @{
+    accountName = "Ví chi tiêu cá nhân"
+    accountType = "PAYMENT"
+    initialDeposit = "0"
+} | ConvertTo-Json
+$accRes = Invoke-RestMethod "$baseUrl/accounts" -Method Post -Headers $headers -ContentType 'application/json' -Body $openAccBody
+$accountId = $accRes.data.id
+Write-Host "   -> Đã mở tài khoản thành công! ID: $accountId" -ForegroundColor Green
+
+Write-Host "4. Đang nạp 1.000.000 VND vào tài khoản..." -ForegroundColor Cyan
+$depositBody = @{
+    type = "CREDIT"
+    amount = "1000000"
+    description = "Nạp tiền sinh hoạt phí"
+} | ConvertTo-Json
+$depRes = Invoke-RestMethod "$baseUrl/accounts/$accountId/transactions" -Method Post -Headers $headers -ContentType 'application/json' -Body $depositBody
+Write-Host "   -> Nạp tiền thành công! Số dư sau nạp: $($depRes.data.balanceAfter) VND" -ForegroundColor Green
+
+Write-Host "5. Đang rút toàn bộ 1.000.000 VND để đưa số dư về 0..." -ForegroundColor Cyan
+$withdrawBody = @{
+    type = "DEBIT"
+    amount = "1000000"
+    description = "Rút tiền về 0 để đóng tài khoản"
+} | ConvertTo-Json
+$withRes = Invoke-RestMethod "$baseUrl/accounts/$accountId/transactions" -Method Post -Headers $headers -ContentType 'application/json' -Body $withdrawBody
+Write-Host "   -> Rút tiền thành công! Số dư hiện tại: $($withRes.data.balanceAfter) VND" -ForegroundColor Green
+
+Write-Host "6. Đang thực hiện đóng tài khoản..." -ForegroundColor Cyan
+Invoke-RestMethod "$baseUrl/accounts/$accountId" -Method Delete -Headers $headers
+Write-Host "   -> Đã đóng tài khoản thành công với mã 204!" -ForegroundColor Green
+
+Write-Host "`n=== KỊCH BẢN THỬ NGHIỆM HOÀN TẤT THÀNH CÔNG 100%! ===" -ForegroundColor Yellow
 ```
-
-Các lệnh tạo dữ liệu demo thật trong database được cấu hình. Đóng tài khoản giữ lại bản ghi và trả `204` không có body.
-
-

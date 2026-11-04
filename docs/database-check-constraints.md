@@ -1,56 +1,46 @@
-# Database CHECK constraints
+# Ràng buộc kiểm tra toàn vẹn cơ sở dữ liệu
 
-Migration `20261020000000_add_domain_check_constraints` implements the checks in
-sections 3.2–3.5 of `phase1_document/phase1-scope-reduced.md` and section 3 of
-`phase1_document/phase1-domain-database-api-contract.md`.
+Tài liệu mô tả chi tiết các ràng buộc kiểm tra toàn vẹn CHECK constraints được cài đặt trực tiếp trong PostgreSQL thông qua bản migration `20261020000000_add_domain_check_constraints`.
 
-| Table | Constraint |
-| --- | --- |
-| `users` | Email equals `lower(btrim(email))` |
-| `bank_accounts` | `current_balance >= 0` |
-| `bank_accounts` | Currency is `VND` |
-| `bank_accounts` | `CLOSED` if and only if `closed_at IS NOT NULL` |
-| `financial_transactions` | `amount > 0` |
-| `financial_transactions` | `balance_after >= 0` |
-| `financial_transactions` | CREDIT for OPENING_DEPOSIT, CASH_DEPOSIT, TRANSFER_IN; DEBIT for CASH_WITHDRAWAL, TRANSFER_OUT |
-| `transfers` | `amount > 0` |
-| `transfers` | Source differs from destination |
+## 1. Lý do cài đặt CHECK constraint ở tầng cơ sở dữ liệu
 
-These checks live in SQL migrations because Prisma schema does not represent
-them. Use migrations to provision databases; `prisma db push` alone does not
-install these checks. The existing unique email index together with the
-normalization check enforces uniqueness for normalized emails.
+Mặc dù hệ thống đã có tầng Domain và tầng Application kiểm tra dữ liệu đầu vào rất kỹ, nhưng nhóm vẫn quyết định bổ sung thêm các ràng buộc CHECK trực tiếp ở mức bảng cơ sở dữ liệu:
+– **Nguyên tắc phòng vệ đa tầng:** Ngay cả khi xảy ra lỗi lập trình ở tầng backend hoặc có can thiệp trực tiếp bằng câu lệnh SQL vào database, dữ liệu vẫn được bảo vệ nguyên vẹn.  
+– **Bù đắp giới hạn của Prisma:** Prisma Schema không hỗ trợ khai báo cú pháp CHECK constraint trực tiếp trong file schema. Do đó, các ràng buộc này được viết bằng câu lệnh SQL thuần và thực thi thông qua cơ chế Prisma Migration.  
 
-## Apply
+## 2. Danh sách các ràng buộc CHECK constraint
 
-With `DATABASE_URL` targeting the intended database:
+| Bảng dữ liệu | Biểu thức SQL | Mục đích bảo vệ |
+| :--- | :--- | :--- |
+| `users` | `email = lower(btrim(email))` | Đảm bảo email luôn được chuẩn hóa (chữ thường, không có khoảng trắng thừa) trước khi lưu. |
+| `bank_accounts` | `current_balance >= 0` | Ngăn chặn tuyệt đối việc tài khoản bị số dư âm ở tầng vật lý. |
+| `bank_accounts` | `currency = 'VND'` | Đảm bảo đơn vị tiền tệ chỉ chấp nhận duy nhất là VND. |
+| `bank_accounts` | `(status = 'CLOSED') = (closed_at IS NOT NULL)` | Đảm bảo tính nhất quán: tài khoản đóng thì bắt buộc phải có thời điểm đóng `closed_at`, và ngược lại. |
+| `financial_transactions` | `amount > 0` | Số tiền giao dịch bắt buộc phải là số nguyên dương. |
+| `financial_transactions` | `balance_after >= 0` | Số dư sau giao dịch ghi nhận trong sổ cái không bao giờ được phép âm. |
+| `financial_transactions` | Khớp loại giao dịch: <br>– `CREDIT` chỉ đi với `OPENING_DEPOSIT`, `CASH_DEPOSIT`, `TRANSFER_IN`<br>– `DEBIT` chỉ đi với `CASH_WITHDRAWAL`, `TRANSFER_OUT` | Ngăn chặn việc ghi sai lệch sổ cái như rút tiền mà lại đánh dấu là tăng tiền. |
+| `transfers` | `amount > 0` | Số tiền chuyển khoản phải là số nguyên dương. |
+| `transfers` | `source_account_id <> destination_account_id` | Ngăn chặn việc chuyển tiền cho chính tài khoản nguồn. |
+
+## 3. Cách thức áp dụng migration
+
+Để chạy bản migration này vào cơ sở dữ liệu, đảm bảo biến môi trường `DATABASE_URL` trong file `.env` đang trỏ đúng tới database đích, sau đó chạy lệnh:
 
 ```powershell
 npx prisma migrate deploy
 ```
 
-The migration validates existing rows and runs atomically in an explicit
-transaction. Invalid existing data causes it to fail without partially adding
-checks. It does not modify balances, transactions or email addresses. Review and
-correct any reported invalid data before retrying; after a failed Prisma deploy,
-mark this migration rolled back with
-`npx prisma migrate resolve --rolled-back 20261020000000_add_domain_check_constraints`
-before deploying again. Schedule deployment appropriately: PostgreSQL must lock
-and scan these tables to add validated checks.
+> [!NOTE]
+> Bản migration được bọc trong một transaction SQL tường minh. Nếu trong database đã tồn tại bất kỳ dòng dữ liệu nào vi phạm các ràng buộc trên, PostgreSQL sẽ từ chối áp dụng và rollback toàn bộ, không gây hỏng cấu trúc bảng hiện tại.
 
-## Verify
+## 4. Kiểm thử tự động các ràng buộc
 
-Point `DATABASE_URL` at a dedicated PostgreSQL database whose name ends in `_test`.
-Then run:
+Nhóm đã xây dựng riêng một bộ kiểm thử tích hợp chuyên biệt để kiểm chứng từng ràng buộc CHECK constraint này:
+– **File kiểm thử:** `test/integration/database/check-constraints.spec.ts`  
+– **Cơ chế hoạt động:** Test suite tự động tạo một schema tạm thời trên PostgreSQL, áp dụng toàn bộ các file migration SQL, sau đó cố tình chạy các câu lệnh chèn dữ liệu vi phạm ràng buộc như số dư âm, email viết hoa, chuyển tiền cùng tài khoản.  
+– **Xác thực:** Kiểm tra xem PostgreSQL có trả về đúng mã lỗi `23514` (`check_violation`) kèm theo tên constraint tương ứng hay không.  
 
+### Lệnh chạy kiểm thử
 ```powershell
 npx jest --config jest.integration.config.js --runInBand test/integration/database/check-constraints.spec.ts
 ```
-
-This suite creates a uniquely named schema, applies the SQL migrations in order,
-and issues direct SQL writes. It checks PostgreSQL error code `23514` and the
-specific constraint name, all five valid and invalid type/reference mappings,
-both inconsistent account states, zero/negative amounts, negative balances,
-email case/whitespace, same-account transfers, and valid boundary values.
-Each test rolls back its data; the suite removes only its own schema afterward.
-It does not apply migrations to the database's public schema.

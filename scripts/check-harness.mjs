@@ -73,7 +73,7 @@ export function checkImports(layer, file, source) {
   const errors = [];
   const lines = source.split('\n');
   lines.forEach((line, i) => {
-    const m = line.match(/(?:from\s+|require\(|import\()\s*['"]([^'"]+)['"]/);
+    const m = line.match(/(?:from\s+|require\(|import\(|^\s*import\s+)\s*['"]([^'"]+)['"]/);
     if (!m) return;
     const spec = m[1];
     const at = `${file}:${i + 1}`;

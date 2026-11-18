@@ -43,4 +43,5 @@ test('application import infrastructure hoặc bcrypt bị chặn', () => {
   assert.equal(checkImports('application', 'f.ts', "import { R } from '../../infrastructure/repo';").length, 1);
   assert.equal(checkImports('application', 'f.ts', "import * as b from 'bcrypt';").length, 1);
   assert.equal(checkImports('application', 'f.ts', "import { P } from '../ports/p';").length, 0);
+  assert.equal(checkImports('application', 'f.ts', "import '../../infrastructure/setup';").length, 1);
 });

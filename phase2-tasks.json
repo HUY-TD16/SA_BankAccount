@@ -8,7 +8,7 @@
       "title": "Dựng harness và CI cho pha 2",
       "owner": "Đạt",
       "branch": "harness/setup",
-      "status": "active",
+      "status": "passing",
       "depends_on": [],
       "behavior": "Repo có AGENTS.md, init.sh, danh sách task, tài liệu pha 2 và CI chạy unit, integration, e2e, swagger, docker build trên mỗi PR.",
       "verification": [
@@ -17,7 +17,8 @@
         "CI xanh trên PR của nhánh harness/setup"
       ],
       "evidence": [
-        "CI run https://github.com/datdooo/SA_BankAccount/actions/runs/44324750668: build, unit, harness, swagger, integration, e2e, docker build đều xanh (commit a038562)"
+        "CI run https://github.com/datdooo/SA_BankAccount/actions/runs/44324750668: build, unit, harness, swagger, integration, e2e, docker build đều xanh (commit a038562)",
+        "Review PR datdooo/SA_BankAccount#1 ngày 18/11/2026, ghi trong docs/phase2/progress/P2-00.md mục Review"
       ]
     },
     {

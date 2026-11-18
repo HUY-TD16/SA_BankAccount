@@ -37,6 +37,7 @@ Notebook Kaggle ghim `REPO_URL` và `COMMIT` ở ô đầu. Đo nhánh nào thì
 ## Bản đồ tài liệu
 
 - `docs/phase2/README.md`: mục lục pha 2, phân công, cách làm việc.
+- `docs/phase2/lich.md`: lịch, mốc từng tuần, ai review ai.
 - `docs/phase2/danh-gia.md`: đánh giá hệ thống hiện tại, điểm nghẽn có số liệu.
 - `docs/phase2/giao-thuc-do.md`: cách đo trước và sau để so sánh được.
 - `docs/phase2/quy-trinh.md`: hợp đồng task, kiểm tra trạng thái sạch, bàn giao.

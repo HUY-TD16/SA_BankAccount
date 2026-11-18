@@ -14,14 +14,16 @@ Pha 2 lấy hệ thống pha 1 làm nền, tìm điểm nghẽn bằng số đo,
 
 Nguồn sự thật là [`phase2-tasks.json`](../../phase2-tasks.json) ở gốc repo. File đó ghi người nhận, nhánh, trạng thái, lệnh xác minh và bằng chứng của từng task. Bảng dưới chỉ để đọc nhanh, nếu lệch thì tin file JSON.
 
-| Task | Việc | Phụ thuộc |
-| --- | --- | --- |
-| P2-00 | Harness và CI | |
-| P2-01 | Đo lại baseline với kịch bản đầy đủ hơn | P2-00 |
-| P2-02 | Giảm tranh chấp ghi trên tài khoản nóng | P2-01 |
-| P2-03 | Cách ly tải đăng nhập | P2-01 |
-| P2-04 | Health endpoint | P2-00 |
-| P2-05 | Báo cáo trước và sau | P2-02, P2-03, P2-04 |
+| Task | Việc | Người | Phụ thuộc |
+| --- | --- | --- | --- |
+| P2-00 | Harness và CI | Đạt | |
+| P2-01 | Đo lại baseline với kịch bản đầy đủ hơn | Đạt | P2-00 |
+| P2-02 | Giảm tranh chấp ghi trên tài khoản nóng | Chiến | P2-01 |
+| P2-03 | Cách ly tải đăng nhập | Hải | P2-01 |
+| P2-04 | Health endpoint | Chiến | P2-00 |
+| P2-05 | Báo cáo trước và sau | Đạt | P2-02, P2-03, P2-04 |
+
+Thứ tự: Đạt làm P2-01, Chiến làm P2-04, Hải viết ADR nháp cho P2-03. Khi P2-01 passing, Chiến chuyển sang P2-02 và Hải bắt đầu code P2-03.
 
 P2-02 và P2-03 cần số baseline v2 làm mốc "trước", nên P2-01 phải xong trước khi hai task này được tính là `active`. Trong lúc chờ, người nhận P2-02 hoặc P2-03 vẫn có thể viết ADR nháp và đọc code.
 

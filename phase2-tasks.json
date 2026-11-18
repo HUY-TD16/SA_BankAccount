@@ -24,9 +24,9 @@
     {
       "id": "P2-01",
       "title": "Đo lại baseline với kịch bản đầy đủ hơn",
-      "owner": "",
-      "branch": "",
-      "status": "not_started",
+      "owner": "Đạt",
+      "branch": "p2-01/baseline-v2",
+      "status": "active",
       "depends_on": [
         "P2-00"
       ],
@@ -52,7 +52,7 @@
     {
       "id": "P2-02",
       "title": "Giảm tranh chấp ghi trên tài khoản nóng",
-      "owner": "",
+      "owner": "Chiến",
       "branch": "",
       "status": "not_started",
       "depends_on": [
@@ -74,8 +74,8 @@
     {
       "id": "P2-03",
       "title": "Cách ly tải đăng nhập (bulkhead và load shedding)",
-      "owner": "",
-      "branch": "",
+      "owner": "Hải",
+      "branch": "p2-03/auth-bulkhead",
       "status": "not_started",
       "depends_on": [
         "P2-01"
@@ -95,9 +95,9 @@
     {
       "id": "P2-04",
       "title": "Health endpoint cho giám sát",
-      "owner": "",
-      "branch": "",
-      "status": "not_started",
+      "owner": "Chiến",
+      "branch": "p2-04/health-endpoint",
+      "status": "active",
       "depends_on": [
         "P2-00"
       ],
@@ -112,7 +112,7 @@
     {
       "id": "P2-05",
       "title": "Báo cáo so sánh trước và sau",
-      "owner": "",
+      "owner": "Đạt",
       "branch": "",
       "status": "not_started",
       "depends_on": [

@@ -9,6 +9,7 @@ Pha 2 lấy hệ thống pha 1 làm nền, tìm điểm nghẽn bằng số đo,
 3. [quy-trinh.md](quy-trinh.md): nhận task, làm, xác minh, review, bàn giao.
 4. [rubric-review.md](rubric-review.md): bảng chấm khi review PR.
 5. [adr/](adr/): các quyết định kiến trúc đã chốt.
+6. [lich.md](lich.md): lịch 3 tuần, mốc, review chéo.
 
 ## Task và người làm
 

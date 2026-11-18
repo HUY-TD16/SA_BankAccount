@@ -1,5 +1,7 @@
 # SA Bank Account - Dịch vụ quản lý tài khoản và giao dịch ngân hàng
 
+> Pha 2: đọc [AGENTS.md](AGENTS.md) và [docs/phase2](docs/phase2/README.md) trước khi làm việc.
+
 Dự án môn học **Kiến trúc Phần mềm**.
 Hệ thống backend cung cấp RESTful API quản lý vòng đời tài khoản ngân hàng và các giao dịch tài chính nội bộ bao gồm đăng ký, đăng nhập, mở tài khoản, nạp tiền, rút tiền, chuyển khoản và truy vấn sao kê.
 

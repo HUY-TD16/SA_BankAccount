@@ -1,6 +1,6 @@
 # Đánh giá hệ thống đầu pha 2
 
-Đánh giá dựa trên code ở commit `c347c92` và số đo pha 1 trong [phase1-load-test.md](../performance/phase1-load-test.md) (Kaggle CPU, 4 vCPU, 28/10 và 31/10/2026).
+Đánh giá dựa trên code ở commit `c347c92`. Số đo pha 1 chạy trên commit `a4a0f83` của repo gốc, lấy từ [phase1-load-test.md](../performance/phase1-load-test.md) (Kaggle CPU, 4 vCPU, 28/10 và 31/10/2026).
 
 ## Những gì đã tốt, cần giữ
 

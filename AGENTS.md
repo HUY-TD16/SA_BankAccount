@@ -21,13 +21,16 @@ Pha 2 của môn Kiến trúc phần mềm: nhóm nhận lại hệ thống này
 
 | Việc | Lệnh |
 | --- | --- |
-| Cài và kiểm tra nhanh | `./init.sh` |
+| Cài và kiểm tra nhanh | `./init.sh` (Windows: chạy trong Git Bash) |
+| Chạy app ở máy | `cp .env.example .env`, điền giá trị, `npx prisma migrate deploy`, `npm run start:dev`, mở `http://localhost:3000/api/docs` |
 | Unit test | `npm test -- --runInBand` |
 | Kiểm tra harness (task list, ranh giới lớp) | `npm run check:harness` |
 | Hợp đồng Swagger | `npm run test:swagger` |
 | Integration test | `DATABASE_URL=<db_test> npx prisma migrate deploy && DATABASE_URL=<db_test> npx jest --config jest.integration.config.js --runInBand` |
 | E2E HTTP | `E2E_DATABASE_URL=<db_test> npm run test:e2e` |
 | Đo tải | notebook `docs/performance/kaggle-load-test.ipynb` trên Kaggle CPU, xem `docs/phase2/giao-thuc-do.md` |
+
+Notebook Kaggle ghim `REPO_URL` và `COMMIT` ở ô đầu. Đo nhánh nào thì đổi hai biến này sang fork của nhóm và đúng SHA đó, nếu không sẽ đo nhầm code cũ.
 
 `<db_test>` là chuỗi kết nối tới một database có tên kết thúc bằng `_test`. Test sẽ xoá dữ liệu trong đó. `./init.sh --db` chạy luôn integration và e2e nếu đã đặt `DATABASE_URL`.
 

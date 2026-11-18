@@ -26,6 +26,11 @@ Giữ nguyên ba kịch bản của pha 1 để nối được với số cũ, t
 
 `protocol.json` mới đặt `id` là `sa-bank-phase2-kaggle-v2`. Không sửa file v1, để còn tái lập được số pha 1.
 
+## Lưu ý với notebook
+
+- Ô đầu notebook ghim `REPO_URL` (đang là repo gốc HUY-TD16) và `COMMIT`. Đổi sang fork của nhóm và SHA cần đo. Notebook tự kiểm `rev-parse HEAD` khớp `COMMIT`.
+- Notebook đang chứa một bản sao của `test/performance/kaggle-load.js`. P2-01 cần cho notebook đọc file trong repo đã checkout thay vì giữ bản sao, để kịch bản đo chỉ có một nguồn.
+
 ## Bắt buộc sau mỗi lượt có ghi tiền
 
 - Số dư cuối = số dư đầu trừ tổng tiền của các request 201.

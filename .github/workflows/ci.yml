@@ -14,8 +14,8 @@ jobs:
     name: Build, unit, harness, swagger
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -46,8 +46,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bank_account_test?schema=public
       E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bank_account_test?schema=public
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: npm
@@ -61,5 +61,5 @@ jobs:
     name: Docker build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: docker build -t sa-bankaccount:ci .

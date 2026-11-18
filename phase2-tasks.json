@@ -16,7 +16,9 @@
         "DATABASE_URL=<db_test> ./init.sh --db",
         "CI xanh trên PR của nhánh harness/setup"
       ],
-      "evidence": []
+      "evidence": [
+        "CI run https://github.com/datdooo/SA_BankAccount/actions/runs/44324750668: build, unit, harness, swagger, integration, e2e, docker build đều xanh (commit a038562)"
+      ]
     },
     {
       "id": "P2-01",
@@ -24,7 +26,9 @@
       "owner": "",
       "branch": "",
       "status": "not_started",
-      "depends_on": ["P2-00"],
+      "depends_on": [
+        "P2-00"
+      ],
       "behavior": "Có bộ số đo baseline v2 trên main hiện tại, bổ sung các kịch bản pha 1 còn thiếu: chuyển khoản, rút tiền rải trên 20 tài khoản (để tách chi phí ghi khỏi chi phí tranh khoá), tải hỗn hợp đăng nhập cùng xem tài khoản, và mức 50, 100 VU.",
       "verification": [
         "Chạy notebook Kaggle với protocol v2, đủ 3 lần lặp mỗi ô",
@@ -32,7 +36,15 @@
         "Bảng tổng hợp ghi vào docs/performance/phase2-baseline.md kèm commit SHA đã đo"
       ],
       "metrics": {
-        "can_do": ["throughput", "p50", "p95", "p99", "tỉ lệ lỗi", "CPU app", "CPU Postgres"]
+        "can_do": [
+          "throughput",
+          "p50",
+          "p95",
+          "p99",
+          "tỉ lệ lỗi",
+          "CPU app",
+          "CPU Postgres"
+        ]
       },
       "evidence": []
     },
@@ -42,7 +54,9 @@
       "owner": "",
       "branch": "",
       "status": "not_started",
-      "depends_on": ["P2-01"],
+      "depends_on": [
+        "P2-01"
+      ],
       "behavior": "Rút và nạp đồng thời trên cùng một tài khoản giữ khoá dòng ngắn hơn hoặc được xếp hàng ở tầng ứng dụng, mà vẫn giữ mọi bất biến trong AGENTS.md. Phương án chọn ghi trong ADR.",
       "verification": [
         "npm test -- --runInBand",
@@ -62,7 +76,9 @@
       "owner": "",
       "branch": "",
       "status": "not_started",
-      "depends_on": ["P2-01"],
+      "depends_on": [
+        "P2-01"
+      ],
       "behavior": "Giới hạn số phép băm bcrypt chạy cùng lúc. Khi hàng đợi đầy, đăng nhập trả 429 kèm Retry-After ngay thay vì để client chờ nhiều giây. Không hạ BCRYPT_ROUNDS.",
       "verification": [
         "npm test -- --runInBand (thêm test cho 429 và Retry-After)",
@@ -81,7 +97,9 @@
       "owner": "",
       "branch": "",
       "status": "not_started",
-      "depends_on": ["P2-00"],
+      "depends_on": [
+        "P2-00"
+      ],
       "behavior": "Có GET /api/v1/health/live (tiến trình sống) và /api/v1/health/ready (kết nối được Postgres). Healthcheck của Dockerfile dùng endpoint này thay vì dựa vào mã 401 của /accounts.",
       "verification": [
         "Thêm case vào test/e2e/banking-http.e2e.cjs: live trả 200, ready trả 200 khi DB sống",
@@ -96,7 +114,11 @@
       "owner": "",
       "branch": "",
       "status": "not_started",
-      "depends_on": ["P2-02", "P2-03", "P2-04"],
+      "depends_on": [
+        "P2-02",
+        "P2-03",
+        "P2-04"
+      ],
       "behavior": "Một báo cáo đặt baseline v2 cạnh số đo sau cải tiến, cùng phần cứng và cùng protocol, giải thích vì sao mỗi thay đổi tạo ra khác biệt và chấp nhận đánh đổi gì.",
       "verification": [
         "Mỗi con số trong báo cáo dẫn được về một lượt chạy Kaggle cụ thể",

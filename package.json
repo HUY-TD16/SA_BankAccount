@@ -11,6 +11,7 @@
     "test": "jest",
     "test:e2e": "prisma generate && npm run build && node --test --test-concurrency=1 test/e2e/banking-http.e2e.cjs",
     "test:swagger": "npm run build && node test/swagger.contract.cjs",
+    "check:harness": "node --test test/harness/*.test.mjs && node scripts/check-harness.mjs",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "build": "nest build && tsc-alias",

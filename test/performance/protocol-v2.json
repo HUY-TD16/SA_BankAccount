@@ -1,0 +1,33 @@
+{
+  "id": "sa-bank-phase2-kaggle-v2",
+  "workloads": ["login", "list", "debit", "debit_spread", "transfer", "mixed"],
+  "cases": {
+    "debit": [1, 5, 20, 50],
+    "debit_spread": [5, 20],
+    "transfer": [5, 20, 50],
+    "list": [1, 5, 20, 50, 100],
+    "login": [1, 5, 20, 40, 80],
+    "mixed": [60]
+  },
+  "mixed": { "login_vus": 40, "list_vus": 20 },
+  "repeats": 3,
+  "duration": "60s",
+  "warmup": "10s",
+  "cooldown_seconds": 2,
+  "think_time_seconds": 0.1,
+  "request_timeout": "30s",
+  "graceful_stop": "35s",
+  "fixture": {
+    "users": 1,
+    "accounts": 20,
+    "account_type": "PAYMENT",
+    "currency": "VND",
+    "initial_balance_per_account": "1000000000",
+    "debit_amount": "1",
+    "transfer_amount": "1",
+    "list_page": 1,
+    "list_limit": 20,
+    "reset_before_each_run": true
+  },
+  "error_threshold": "rate<0.01"
+}

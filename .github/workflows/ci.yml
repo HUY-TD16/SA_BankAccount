@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Build, unit, harness, swagger
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npm run build
+      - run: npm test -- --runInBand
+      - run: npm run check:harness
+      - run: node test/swagger.contract.cjs
+
+  database:
+    name: Integration và e2e với PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bank_account_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bank_account_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      # Database chỉ sống trong job này; mật khẩu không phải bí mật.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bank_account_test?schema=public
+      E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/bank_account_test?schema=public
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - run: npx prisma migrate deploy
+      - run: npx jest --config jest.integration.config.js --runInBand
+      - run: npm run test:e2e
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: docker build -t sa-bankaccount:ci .

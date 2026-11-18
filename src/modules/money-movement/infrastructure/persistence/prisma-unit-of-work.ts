@@ -104,7 +104,8 @@ export class PrismaUnitOfWork implements UnitOfWorkPort {
               description: input.description ?? null,
             },
           });
-          return record as unknown as TransactionEntryRecord;
+          // Prisma trả Decimal; port hứa chuỗi, nên đổi ở đây thay vì ép kiểu.
+          return { ...record, amount: record.amount.toString(), balanceAfter: record.balanceAfter.toString() } as TransactionEntryRecord;
         },
       },
 
@@ -121,7 +122,7 @@ export class PrismaUnitOfWork implements UnitOfWorkPort {
               },
             },
           });
-          return record ? (record as unknown as TransferRecord) : null;
+          return record ? ({ ...record, amount: record.amount.toString() } as TransferRecord) : null;
         },
 
         create: async (input: CreateTransferInput): Promise<TransferRecord> => {
@@ -135,7 +136,7 @@ export class PrismaUnitOfWork implements UnitOfWorkPort {
               idempotencyKey: input.idempotencyKey,
             },
           });
-          return record as unknown as TransferRecord;
+          return { ...record, amount: record.amount.toString() } as TransferRecord;
         },
       },
     };

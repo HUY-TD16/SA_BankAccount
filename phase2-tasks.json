@@ -1,0 +1,131 @@
+{
+  "phase": 2,
+  "hardware": "Kaggle Notebook CPU: Intel Xeon 2.20 GHz, 4 vCPU, 30 GB RAM. Mọi số đo trước và sau đều phải chạy trên cấu hình này.",
+  "rules": "Trạng thái: not_started, active, blocked, passing. Mỗi người một task active. passing cần evidence. Kiểm tra bằng npm run check:harness.",
+  "tasks": [
+    {
+      "id": "P2-00",
+      "title": "Dựng harness và CI cho pha 2",
+      "owner": "Đạt",
+      "branch": "harness/setup",
+      "status": "passing",
+      "depends_on": [],
+      "behavior": "Repo có AGENTS.md, init.sh, danh sách task, tài liệu pha 2 và CI chạy unit, integration, e2e, swagger, docker build trên mỗi PR.",
+      "verification": [
+        "./init.sh",
+        "DATABASE_URL=<db_test> ./init.sh --db",
+        "CI xanh trên PR của nhánh harness/setup"
+      ],
+      "evidence": [
+        "CI run https://github.com/datdooo/SA_BankAccount/actions/runs/44324750668: build, unit, harness, swagger, integration, e2e, docker build đều xanh (commit a038562)",
+        "Review PR datdooo/SA_BankAccount#1 ngày 18/11/2026, ghi trong docs/phase2/progress/P2-00.md mục Review"
+      ]
+    },
+    {
+      "id": "P2-01",
+      "title": "Đo lại baseline với kịch bản đầy đủ hơn",
+      "owner": "",
+      "branch": "",
+      "status": "not_started",
+      "depends_on": [
+        "P2-00"
+      ],
+      "behavior": "Có bộ số đo baseline v2 trên main hiện tại, bổ sung các kịch bản pha 1 còn thiếu: chuyển khoản, rút tiền rải trên 20 tài khoản (để tách chi phí ghi khỏi chi phí tranh khoá), tải hỗn hợp đăng nhập cùng xem tài khoản, và mức 50, 100 VU.",
+      "verification": [
+        "Chạy notebook Kaggle với protocol v2, đủ 3 lần lặp mỗi ô",
+        "Kiểm tra đối soát số dư và sổ cái pass ở mọi lượt rút và chuyển",
+        "Bảng tổng hợp ghi vào docs/performance/phase2-baseline.md kèm commit SHA đã đo"
+      ],
+      "metrics": {
+        "can_do": [
+          "throughput",
+          "p50",
+          "p95",
+          "p99",
+          "tỉ lệ lỗi",
+          "CPU app",
+          "CPU Postgres"
+        ]
+      },
+      "evidence": []
+    },
+    {
+      "id": "P2-02",
+      "title": "Giảm tranh chấp ghi trên tài khoản nóng",
+      "owner": "",
+      "branch": "",
+      "status": "not_started",
+      "depends_on": [
+        "P2-01"
+      ],
+      "behavior": "Rút và nạp đồng thời trên cùng một tài khoản giữ khoá dòng ngắn hơn hoặc được xếp hàng ở tầng ứng dụng, mà vẫn giữ mọi bất biến trong AGENTS.md. Phương án chọn ghi trong ADR.",
+      "verification": [
+        "npm test -- --runInBand",
+        "DATABASE_URL=<db_test> ./init.sh --db",
+        "Bài test 20 lệnh rút 10.000 trên số dư 100.000 vẫn ra đúng 10 thành công, 10 lỗi 409, số dư 0",
+        "Đo lại kịch bản rút tiền một tài khoản nóng ở 5, 20, 50 VU theo protocol v2"
+      ],
+      "metrics": {
+        "truoc": "Lấy từ P2-01. Tham khảo pha 1: 20 VU p95 324 ms, p99 583 ms, 99 req/s.",
+        "muc_tieu": "p95 ở 20 VU thấp hơn baseline v2, tỉ lệ lỗi 0%, đối soát pass 100%."
+      },
+      "evidence": []
+    },
+    {
+      "id": "P2-03",
+      "title": "Cách ly tải đăng nhập (bulkhead và load shedding)",
+      "owner": "",
+      "branch": "",
+      "status": "not_started",
+      "depends_on": [
+        "P2-01"
+      ],
+      "behavior": "Giới hạn số phép băm bcrypt chạy cùng lúc. Khi hàng đợi đầy, đăng nhập trả 429 kèm Retry-After ngay thay vì để client chờ nhiều giây. Không hạ BCRYPT_ROUNDS.",
+      "verification": [
+        "npm test -- --runInBand (thêm test cho 429 và Retry-After)",
+        "DATABASE_URL=<db_test> ./init.sh --db",
+        "Đo đăng nhập 20, 40, 80 VU và tải hỗn hợp đăng nhập cùng xem tài khoản theo protocol v2"
+      ],
+      "metrics": {
+        "truoc": "Lấy từ P2-01. Tham khảo pha 1: đăng nhập bão hoà 11.7 req/s, 80 VU p99 6.79 s.",
+        "muc_tieu": "Throughput đăng nhập thành công không giảm so với trước; p99 của request được nhận giảm rõ; request bị từ chối nhận 429 trong vài ms. Nếu P2-01 cho thấy tải đăng nhập làm chậm endpoint khác thì p95 của endpoint đó cũng phải giảm."
+      },
+      "evidence": []
+    },
+    {
+      "id": "P2-04",
+      "title": "Health endpoint cho giám sát",
+      "owner": "",
+      "branch": "",
+      "status": "not_started",
+      "depends_on": [
+        "P2-00"
+      ],
+      "behavior": "Có GET /api/v1/health/live (tiến trình sống) và /api/v1/health/ready (kết nối được Postgres). Healthcheck của Dockerfile dùng endpoint này thay vì dựa vào mã 401 của /accounts.",
+      "verification": [
+        "Thêm case vào test/e2e/banking-http.e2e.cjs: live trả 200, ready trả 200 khi DB sống",
+        "E2E_DATABASE_URL=<db_test> npm run test:e2e",
+        "docker build thành công trong CI"
+      ],
+      "evidence": []
+    },
+    {
+      "id": "P2-05",
+      "title": "Báo cáo so sánh trước và sau",
+      "owner": "",
+      "branch": "",
+      "status": "not_started",
+      "depends_on": [
+        "P2-02",
+        "P2-03",
+        "P2-04"
+      ],
+      "behavior": "Một báo cáo đặt baseline v2 cạnh số đo sau cải tiến, cùng phần cứng và cùng protocol, giải thích vì sao mỗi thay đổi tạo ra khác biệt và chấp nhận đánh đổi gì.",
+      "verification": [
+        "Mỗi con số trong báo cáo dẫn được về một lượt chạy Kaggle cụ thể",
+        "Mỗi cải tiến dẫn được về một ADR đã duyệt"
+      ],
+      "evidence": []
+    }
+  ]
+}

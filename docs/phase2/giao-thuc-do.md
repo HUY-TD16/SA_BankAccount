@@ -34,6 +34,7 @@ Hiện thực ở `test/performance/protocol-v2.json` (`id` là `sa-bank-phase2-
 
 - Ô đầu notebook ghim `REPO_URL` (đang là repo gốc HUY-TD16) và `COMMIT`. Đổi sang fork của nhóm và SHA cần đo. Notebook tự kiểm `rev-parse HEAD` khớp `COMMIT`.
 - Notebook đọc `test/performance/kaggle-load.js` và file protocol từ repo đã checkout, không giữ bản sao. Đổi kịch bản thì sửa file trong repo, rồi đo lại bằng SHA mới.
+- Chạy nền không cần giữ trình duyệt: tạo notebook Kaggle một ô với lệnh ở đầu `test/performance/kaggle_batch.py`, bật Internet, bấm Save Version, chọn Save & Run All. Output có `executed-<mode>-<sha>.ipynb` và file zip kết quả.
 - `WORKLOADS` ở ô đầu chọn chạy một phần kịch bản, ví dụ `['debit', 'login', 'mixed']`.
 - Notebook mới chỉ chạy protocol v2. Muốn tái lập số pha 1 thì dùng notebook ở commit `e83d991`.
 

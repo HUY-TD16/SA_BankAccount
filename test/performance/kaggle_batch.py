@@ -2,9 +2,13 @@
 # so the browser does not have to stay open. One-cell Kaggle notebook, Internet on, no accelerator:
 #   !curl -fsSL https://raw.githubusercontent.com/datdooo/SA_BankAccount/<SHA>/test/performance/kaggle_batch.py | python - <SHA> full
 # Optional third argument: JSON list of workloads, e.g. '["debit","login","mixed"]'.
+# Offline (Internet off): run the copy inside the dataset from build-offline-bundle.sh instead:
+#   !python /kaggle/input/<dataset>/kaggle_batch.py <SHA> full
 import json
+import subprocess
 import sys
 import urllib.request
+from pathlib import Path
 
 import nbformat
 from nbclient import NotebookClient
@@ -13,8 +17,18 @@ sha, mode = sys.argv[1], sys.argv[2]
 workloads = json.loads(sys.argv[3]) if len(sys.argv) > 3 else None
 assert len(sha) == 40, 'SHA must be the full commit being measured'
 assert mode in ('smoke', 'full')
-url = f'https://raw.githubusercontent.com/datdooo/SA_BankAccount/{sha}/docs/performance/kaggle-load-test.ipynb'
-nb = nbformat.reads(urllib.request.urlopen(url).read().decode(), as_version=4)
+bundle = Path(globals().get('__file__', '-')).resolve().parent / 'repo.bundle'
+if bundle.exists():
+    # Same checkout path as the notebook's ROOT, so the notebook reuses it.
+    root = Path('/tmp/bank-source') / sha
+    if not root.exists():
+        subprocess.run(['git', 'clone', '-q', str(bundle), str(root)], check=True)
+    subprocess.run(['git', '-C', str(root), 'checkout', '-q', '--detach', sha], check=True)
+    text = (root / 'docs/performance/kaggle-load-test.ipynb').read_text()
+else:
+    url = f'https://raw.githubusercontent.com/datdooo/SA_BankAccount/{sha}/docs/performance/kaggle-load-test.ipynb'
+    text = urllib.request.urlopen(url).read().decode()
+nb = nbformat.reads(text, as_version=4)
 source = nb.cells[2].source
 for old, new in [("MODE = 'smoke'", f'MODE = {mode!r}'), ("COMMIT = 'ĐIỀN_SHA_CẦN_ĐO'", f'COMMIT = {sha!r}'),
                  ('WORKLOADS = None', f'WORKLOADS = {workloads!r}')]:

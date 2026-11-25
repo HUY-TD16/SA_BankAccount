@@ -26,7 +26,7 @@
       "title": "Đo lại baseline với kịch bản đầy đủ hơn",
       "owner": "Đạt",
       "branch": "p2-01/baseline-v2",
-      "status": "active",
+      "status": "passing",
       "depends_on": [
         "P2-00"
       ],
@@ -47,7 +47,11 @@
           "CPU Postgres"
         ]
       },
-      "evidence": []
+      "evidence": [
+        "Kaggle kernel datdoooooooo/sa-bank-load-full bản 1, ngày 25/11/2026, commit b6d07cd, protocol sa-bank-phase2-kaggle-v2, 60/60 lượt, Internet tắt (dataset offline datdoooooooo/sa-bank-offline)",
+        "report-full.json: balance_ok true, error_threshold_pass true, bài rút vượt số dư 10/10/0/10",
+        "Bảng trung vị: docs/performance/phase2-baseline.md; zip bank-test-20261125-024344-full.zip sha256 45590c5f...9d40"
+      ]
     },
     {
       "id": "P2-02",

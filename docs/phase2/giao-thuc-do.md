@@ -8,10 +8,10 @@ Mục tiêu: một con số "sau" chỉ có nghĩa khi đặt cạnh con số "t
 - Phần mềm: Node 24, PostgreSQL 15, k6 cùng bản với baseline. Ghi phiên bản thật vào log.
 - Cấu hình app: `NODE_ENV=production`, `BCRYPT_ROUNDS=12`, `UV_THREADPOOL_SIZE=4`. Task nào muốn đổi một trong các giá trị này phải nói rõ trong ADR và đo lại cả "trước" với giá trị mới.
 - Cách chạy: app, Postgres và k6 trên cùng notebook, như pha 1.
-- Dữ liệu: reset trước mỗi lượt, fixture theo `test/performance/protocol.json`.
+- Dữ liệu: reset trước mỗi lượt, fixture theo `test/performance/protocol-v2.json` (pha 1 dùng `protocol.json`).
 - Mỗi ô (kịch bản x số VU) chạy 3 lần, 60 giây, có 10 giây làm nóng riêng. Báo cáo trung vị của 3 lần, kèm min và max để thấy độ dao động.
 
-## Protocol v2 (P2-01 sẽ hiện thực)
+## Protocol v2
 
 Giữ nguyên ba kịch bản của pha 1 để nối được với số cũ, thêm:
 
@@ -24,12 +24,21 @@ Giữ nguyên ba kịch bản của pha 1 để nối được với số cũ, t
 | `login` | như pha 1 | 1, 5, 20, 40, 80 |
 | `mixed` | một nhóm VU đăng nhập liên tục, nhóm khác xem danh sách; đo riêng độ trễ từng nhóm | 40 login + 20 list |
 
-`protocol.json` mới đặt `id` là `sa-bank-phase2-kaggle-v2`. Không sửa file v1, để còn tái lập được số pha 1.
+Hiện thực ở `test/performance/protocol-v2.json` (`id` là `sa-bank-phase2-kaggle-v2`) và `test/performance/kaggle-load.js`. Không sửa `protocol.json` của v1, để còn tái lập được số pha 1.
+
+- `transfer` chọn ngẫu nhiên nguồn và đích khác nhau trong 20 tài khoản, mỗi lần 1 VND.
+- `mixed` chạy hai scenario k6 cùng lúc. Bảng kết quả có hai dòng `mixed:login` và `mixed:list`, cột `vus` ghi tổng 60.
+- CPU Postgres (`pg_cpu_avg_pct`) là tổng CPU của postmaster và các backend, đo mỗi giây như CPU app.
 
 ## Lưu ý với notebook
 
 - Ô đầu notebook ghim `REPO_URL` (đang là repo gốc HUY-TD16) và `COMMIT`. Đổi sang fork của nhóm và SHA cần đo. Notebook tự kiểm `rev-parse HEAD` khớp `COMMIT`.
-- Notebook đang chứa một bản sao của `test/performance/kaggle-load.js`. P2-01 cần cho notebook đọc file trong repo đã checkout thay vì giữ bản sao, để kịch bản đo chỉ có một nguồn.
+- Notebook đọc `test/performance/kaggle-load.js` và file protocol từ repo đã checkout, không giữ bản sao. Đổi kịch bản thì sửa file trong repo, rồi đo lại bằng SHA mới.
+- Chạy nền không cần giữ trình duyệt: tạo notebook Kaggle một ô với lệnh ở đầu `test/performance/kaggle_batch.py`, bật Internet, bấm Save Version, chọn Save & Run All. Output có `executed-<mode>-<sha>.ipynb` và file zip kết quả.
+- Chạy offline (tài khoản Kaggle không bật được Internet): `test/performance/build-offline-bundle.sh <sha> <thư mục>` đóng gói Node, k6, PostgreSQL, psutil, source và `node_modules` bản Linux. Upload thư mục đó thành dataset (`kaggle datasets create -p <thư mục>`, hoặc `kaggle datasets version` cho SHA mới), gắn vào kernel tắt Internet, rồi chạy `kaggle_batch.py` trong dataset. Notebook tự nhận dataset qua `repo.bundle`.
+- Offline khác lúc có Internet ở ba chỗ, phải ghi trong báo cáo: PostgreSQL 15.19 là bản dựng sẵn của `@embedded-postgres/linux-x64` thay cho gói PGDG; migration áp bằng chính các file `prisma/migrations/*/migration.sql` thay cho `prisma migrate deploy`; psutil lấy bản có sẵn trên Kaggle nếu khác bản trong dataset (ghi trong `environment.json`). Trước và sau phải cùng một cách chạy.
+- `WORKLOADS` ở ô đầu chọn chạy một phần kịch bản, ví dụ `['debit', 'login', 'mixed']`.
+- Notebook mới chỉ chạy protocol v2. Muốn tái lập số pha 1 thì dùng notebook ở commit `e83d991`.
 
 ## Bắt buộc sau mỗi lượt có ghi tiền
 

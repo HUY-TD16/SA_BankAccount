@@ -26,7 +26,7 @@ Nhóm thiết kế 3 kịch bản đại diện cho 3 nhóm thao tác đặc th�
 3. **Kịch bản 3: Rút tiền đồng thời** (`POST /accounts/{id}/transactions`)  
    Nhiều client ảo cùng thực hiện rút 1 VND trên cùng một tài khoản duy nhất, đại diện cho luồng ghi cạnh tranh khóa dòng dữ liệu `SELECT ... FOR UPDATE`.
 
-Mỗi kịch bản được thực thi ở 3 mức tải đồng thời: **1 VU**, **5 VU** và **20 VU**. Mỗi lượt đo kéo dài **60 giây**, có **10 giây làm nóng** riêng biệt, và được lặp lại **3 lần** độc lập để lấy giá trị trung vị. Tổng cộng thực hiện **27 lượt đo chính thức**.
+Mỗi kịch bản được thực thi ở 3 mức tải đồng thời: **1 VU**, **5 VU** và **20 VU**. Mỗi lượt đo kéo dài **60 giây**, có **10 giây làm nóng** riêng biệt, và được lặp lại **3 lần**  lậđộcp để lấy giá trị trung vị. Tổng cộng thực hiện **27 lượt đo chính thức**.
 
 ## 3. Kết quả đo tải thực tế
 

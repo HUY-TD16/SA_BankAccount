@@ -35,6 +35,8 @@ Hiện thực ở `test/performance/protocol-v2.json` (`id` là `sa-bank-phase2-
 - Ô đầu notebook ghim `REPO_URL` (đang là repo gốc HUY-TD16) và `COMMIT`. Đổi sang fork của nhóm và SHA cần đo. Notebook tự kiểm `rev-parse HEAD` khớp `COMMIT`.
 - Notebook đọc `test/performance/kaggle-load.js` và file protocol từ repo đã checkout, không giữ bản sao. Đổi kịch bản thì sửa file trong repo, rồi đo lại bằng SHA mới.
 - Chạy nền không cần giữ trình duyệt: tạo notebook Kaggle một ô với lệnh ở đầu `test/performance/kaggle_batch.py`, bật Internet, bấm Save Version, chọn Save & Run All. Output có `executed-<mode>-<sha>.ipynb` và file zip kết quả.
+- Chạy offline (tài khoản Kaggle không bật được Internet): `test/performance/build-offline-bundle.sh <sha> <thư mục>` đóng gói Node, k6, PostgreSQL, psutil, source và `node_modules` bản Linux. Upload thư mục đó thành dataset (`kaggle datasets create -p <thư mục>`, hoặc `kaggle datasets version` cho SHA mới), gắn vào kernel tắt Internet, rồi chạy `kaggle_batch.py` trong dataset. Notebook tự nhận dataset qua `repo.bundle`.
+- Offline khác lúc có Internet ở ba chỗ, phải ghi trong báo cáo: PostgreSQL 15.19 là bản dựng sẵn của `@embedded-postgres/linux-x64` thay cho gói PGDG; migration áp bằng chính các file `prisma/migrations/*/migration.sql` thay cho `prisma migrate deploy`; psutil lấy bản có sẵn trên Kaggle nếu khác bản trong dataset (ghi trong `environment.json`). Trước và sau phải cùng một cách chạy.
 - `WORKLOADS` ở ô đầu chọn chạy một phần kịch bản, ví dụ `['debit', 'login', 'mixed']`.
 - Notebook mới chỉ chạy protocol v2. Muốn tái lập số pha 1 thì dùng notebook ở commit `e83d991`.
 

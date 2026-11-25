@@ -7,6 +7,7 @@ import { AccountsModule } from "@src/modules/accounts/accounts.module";
 import { MoneyMovementModule } from "@src/modules/money-movement/money-movement.module";
 import { AccessTokenGuard } from "@src/common/security/guards";
 import { ObservabilityModule } from "@src/common/observability";
+import { HealthModule } from "@src/modules/health/health.module";
 import {
   validateEnv,
   appConfig,
@@ -26,6 +27,7 @@ import {
     IdentityModule,
     AccountsModule,
     MoneyMovementModule,
+    HealthModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: AccessTokenGuard },

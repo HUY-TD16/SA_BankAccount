@@ -231,3 +231,11 @@ test('transfer header validation, insufficient funds and closed destination do n
   assert.equal((await http(`/accounts/${a.id}`, { token: alice.token })).data.currentBalance, '100');
   assert.equal((await http(`/accounts/${a.id}/transactions`, { token: alice.token })).pagination.total, 1);
 });
+
+test('health endpoints report live and ready', async () => {
+  const live = await http('/health/live');
+  assert.equal(live.data.status, 'ok');
+
+  const ready = await http('/health/ready');
+  assert.equal(ready.data.status, 'ok');
+});

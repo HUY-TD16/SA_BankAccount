@@ -31,3 +31,18 @@ export interface TransactionQueryPort {
   findAccountOwner(accountId: string): Promise<string | null>;
   findTransactions(filter: TransactionFilter): Promise<PaginatedTransactionsResult>;
 }
+
+export interface TransactionFeedFilter extends Omit<TransactionFilter, 'page'> {
+  cursor?: string;
+}
+
+export interface TransactionFeedResult {
+  items: TransactionItemDto[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface TransactionFeedQueryPort {
+  findAccountOwner(accountId: string): Promise<string | null>;
+  findTransactionFeed(filter: TransactionFeedFilter): Promise<TransactionFeedResult>;
+}
